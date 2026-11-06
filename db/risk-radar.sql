@@ -24,6 +24,6 @@ CREATE TABLE IF NOT EXISTS risk_radar (
   expected_priority_needs text NOT NULL DEFAULT '',
   impact_materialisation_description text NOT NULL DEFAULT '',
   rationale_update text NOT NULL DEFAULT '',
-  source_row integer UNIQUE CHECK (source_row BETWEEN 1 AND 10),
+  source_row integer UNIQUE CHECK (source_row > 0),
   created_at timestamptz NOT NULL DEFAULT now()
 );

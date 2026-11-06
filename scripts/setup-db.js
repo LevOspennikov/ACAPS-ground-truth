@@ -1,11 +1,13 @@
 import { readFile } from 'node:fs/promises';
 import { neon } from '@neondatabase/serverless';
-import { riskRadarSeedQueries } from '../db/seed-risk-radar.js';
+import { seedCountryRisks } from '../db/seed-risk-radar.js';
 const connectionString = process.env.DATABASE_URL || process.env.STORAGE_DATABASE_URL;
 if (!connectionString) throw new Error('Set DATABASE_URL or STORAGE_DATABASE_URL in .env first.');
 const sql = neon(connectionString);
 const schema = await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
 const statements = schema.split(';').map((s) => s.trim()).filter(Boolean);
 const riskSchema = await readFile(new URL('../db/risk-radar.sql', import.meta.url), 'utf8');
-await sql.transaction([...statements.map((statement) => sql.query(statement)), sql.query(riskSchema), ...riskRadarSeedQueries(sql)]);
+const links = await readFile(new URL('../db/country-risk.sql', import.meta.url), 'utf8');
+await sql.transaction([...statements.map((statement) => sql.query(statement)), sql.query(riskSchema), ...links.split(';').map((s) => s.trim()).filter(Boolean).map((s) => sql.query(s))]);
+await seedCountryRisks(sql);
 console.log('Database schema ready. Create your first synthetic questionnaire in /admin.');

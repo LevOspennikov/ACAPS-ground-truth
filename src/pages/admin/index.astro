@@ -1,42 +1,38 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { configured, db, databaseVersion } from '../../server/db.js';
-import { listRegions } from '../../server/regions.js';
+import AdminAccess from '../../components/AdminAccess.astro';
+import RiskQuestionnaires from '../../components/RiskQuestionnaires.astro';
+import { configured } from '../../server/db.js';
 import { isAdmin } from '../../server/auth.js';
+import { listRegions, regionBoard } from '../../server/regions.js';
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
-let stats = null;
-let regions = [];
-const search = (Astro.url.searchParams.get('q') || '').trim().slice(0,80);
-let version = null;
-let failed = false;
+const search = (Astro.url.searchParams.get('q') || '').trim().slice(0, 80);
+const country = (Astro.url.searchParams.get('country') || '').slice(0, 80);
+const risk = (Astro.url.searchParams.get('risk') || '').slice(0, 40);
+const PageLayout = authenticated ? AdminLayout : Layout;
+let regions = []; let selected = null; let failed = false;
 if (authenticated) {
   try {
-    version = await databaseVersion();
     regions = await listRegions(search);
-    [stats] = await db()`SELECT (SELECT count(*)::int FROM experts) AS users,
-      (SELECT count(*)::int FROM crises WHERE archived = false) AS crises,
-      (SELECT count(*)::int FROM questionnaires) AS questionnaires,
-      (SELECT count(*)::int FROM responses WHERE submitted_at IS NOT NULL) AS submitted`;
-  } catch { failed = true; }
+    const slug = country || regions[0]?.slug;
+    if (slug) selected = await regionBoard(slug, risk);
+  } catch { failed = true; Astro.response.status = 503; }
 }
 ---
-{!authenticated ? <Layout title="Admin sign in"><p class="eyebrow">ORGANISER WORKSPACE</p><h1>Admin sign in</h1>
-  {!ready ? <p class="notice">Configure the Neon database connection, ADMIN_PASSWORD and SESSION_SECRET in Vercel first.</p> : <form class="card" method="post" action="/api/admin/login">
-    {Astro.url.searchParams.has('error') && <p class="notice error" role="alert">Sign in failed. Check your password and try again.</p>}
-    <label for="password">Admin password</label><input id="password" name="password" type="password" required autocomplete="current-password" maxlength="256" /><div class="actions"><button>Sign in</button></div>
-  </form>}
-</Layout> : <AdminLayout title="Admin overview"><p class="eyebrow">ORGANISER WORKSPACE</p><h1>Ground Truth overview</h1>
-  <p class="intro">Manage experts, organize crises, and invite people back to their assigned work.</p>
-  {stats && <div class="grid"><section class="card"><h2>Users</h2><p class="stat">{stats.users}</p><a href="/admin/users">Manage users →</a></section><section class="card"><h2>Active crises</h2><p class="stat">{stats.crises}</p><a href="/admin/crises">Manage crises →</a></section><section class="card"><h2>Questionnaires</h2><p class="stat">{stats.questionnaires}</p><p>{stats.submitted} submitted responses</p></section></div>}
-  <section><h2>Regions</h2><p>Existing region contacts, reports and questionnaire editor.</p><form class="search" method="get"><label for="region-search">Search regions</label><input id="region-search" name="q" value={search} maxlength="80" /><button>Search</button></form>
-    {!failed && !regions.length && <p class="notice">No regions found.</p>}
-    <div class="region-grid">{regions.map((region) => <a class="region-link" href={`/admin/regions/${region.slug}`}>{region.name}</a>)}</div>
-    {Astro.url.searchParams.get('error') === 'region' && <p class="notice error">That region already exists.</p>}
-    <form class="card" method="post" action="/api/admin/region"><h3>Add a region</h3><label for="region-name">Name</label><input id="region-name" name="name" required maxlength="80" /><div class="actions"><button>Add region</button></div></form>
-  </section>
-  <section class="card"><h2>Neon connection</h2>{version ? <><p>Connected successfully.</p><p class="muted">{version}</p></> : <p class="notice error">Could not connect to Neon. Check the deployment environment.</p>}
-    {failed && version && <><p class="notice error">The application schema is not ready. Initialization creates missing tables; schema changes to existing tables require the next prototype reset deployment.</p><form method="post" action="/api/admin/setup"><button>Initialize missing tables</button></form></>}
-  </section>
-</AdminLayout>}
+<PageLayout title="Country risks">
+  <AdminAccess ready={ready} authenticated={authenticated}>
+    <div class="row"><div><p class="eyebrow">ACAPS GROUND TRUTH</p><h1>Country risks</h1></div></div>
+    <p>Each region is one country. Choose a country, select a risk, then open or create a questionnaire for that risk.</p>
+    {import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true' && <p class="notice error">Prototype mode: production deployments reset application data and restore the twelve imported risks. Manually added risks and questionnaires will be removed.</p>}
+    {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Risk saved in the database.</p>}
+    {failed ? <p class="notice error" role="alert">Country risk data could not be loaded. Apply the updated database schema and seed, then retry.</p> : <>
+      <form class="search" method="get"><label for="q">Search countries</label><input id="q" name="q" value={search} maxlength="80" /><button>Search</button><a href="/admin">Clear</a></form>
+      <nav class="region-grid" aria-label="Countries">{regions.map((r) => <a class="region-link" aria-current={selected?.slug === r.slug ? 'page' : undefined} href={`/admin?country=${encodeURIComponent(r.slug)}`}>{r.name} · {r.risks} risks</a>)}</nav>
+      {!regions.length && <p class="notice">No countries found.</p>}
+      {country && !selected && <p class="notice error">Country not found. Choose a country above.</p>}
+      {selected && <><h2>{selected.name}</h2><p><a href={`/admin/regions/${selected.slug}`}>Contacts and reports for {selected.name} →</a></p><RiskQuestionnaires region={selected} /></>}
+    </>}
+  </AdminAccess>
+</PageLayout>
