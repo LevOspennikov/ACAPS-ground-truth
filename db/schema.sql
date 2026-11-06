@@ -33,3 +33,35 @@ CREATE TABLE IF NOT EXISTS responses (
   updated_at timestamptz NOT NULL DEFAULT now(),
   submitted_at timestamptz
 );
+
+CREATE TABLE IF NOT EXISTS regions (
+  slug text PRIMARY KEY,
+  name text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS reports (
+  id uuid PRIMARY KEY,
+  region_slug text NOT NULL REFERENCES regions(slug),
+  title text NOT NULL,
+  summary text NOT NULL,
+  published_on date NOT NULL DEFAULT CURRENT_DATE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE experts ADD COLUMN IF NOT EXISTS region_slug text REFERENCES regions(slug);
+ALTER TABLE experts ADD COLUMN IF NOT EXISTS focus text NOT NULL DEFAULT '';
+ALTER TABLE questionnaires ADD COLUMN IF NOT EXISTS region_slug text REFERENCES regions(slug);
+ALTER TABLE questionnaires ADD COLUMN IF NOT EXISTS sent_at timestamptz;
+CREATE TABLE IF NOT EXISTS questions (
+  id uuid PRIMARY KEY,
+  questionnaire_id uuid NOT NULL REFERENCES questionnaires(id),
+  position integer NOT NULL,
+  type text NOT NULL CHECK (type IN ('single', 'text')),
+  prompt text NOT NULL,
+  options text NOT NULL DEFAULT '',
+  placeholder text NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS questionnaire_answers (
+  assignment_id uuid PRIMARY KEY REFERENCES assignments(id),
+  answer text NOT NULL,
+  submitted_at timestamptz NOT NULL DEFAULT now()
+);
