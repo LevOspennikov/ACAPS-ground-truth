@@ -59,6 +59,16 @@ Add risks from the selected country's expandable form. The server fixes the coun
 
 `npm run db:setup` creates the base schema, risk catalog and country-risk links, then imports the 12 records and their regions. Production builds do the same non-destructive initialization after the optional prototype reset. Preview builds never mutate the database automatically: use a separate preview database and initialize it explicitly. With reset mode enabled, production deployments erase manual entries and questionnaires and restore the 12 seeded risks and five countries.
 
+## Expert countries, risks and invitations
+
+Create/edit an expert in **Users** and select one or more countries. For each checked country, choose all-risk coverage or a nonempty set of that country's risks. Anonymous profiles use the same coverage settings without storing name or email. Existing users with no country show **Needs country assignment**. Existing region contacts are backfilled as all-risk members of their original country. Region contacts and Users share the same memberships.
+
+Open a country/risk questionnaire, add questions, then select recipients under **Recipients and invitation links**. The picker includes active experts with matching coverage and existing recipients. **Generate invitation links** creates assignments and 48-hour single-use links atomically; copy each link to its intended expert. Raw links are shown only in the authenticated POST response, never stored in plaintext. No email is sent automatically.
+
+Questions lock after the first invitation. Admins can later invite additional matching experts or regenerate links for previous recipients. Regeneration preserves assignments, drafts, submissions and valid sessions; older unused links are revoked. Changing country/risk coverage affects future assignments only: existing assignments and return links remain usable, even outside new coverage. Deactivation still blocks all access. Crisis-only questionnaires without country/risk retain the manual assignment path.
+
+`db/expert-coverage.sql` creates `expert_countries` and `expert_risks` after the country-risk schema and backfills legacy contacts without replacing existing coverage. Setup and production initialization include it; prototype reset includes both new tables. Use a separate initialized database for local/preview checks. Production data is not changed by an unmerged feature branch.
+
 ## Structure
 
 ```text

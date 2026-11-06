@@ -3,14 +3,16 @@ import Layout from "../../../../../layouts/Layout.astro";
 import AdminAccess from "../../../../../components/AdminAccess.astro";
 import { configured } from "../../../../../server/db.js";
 import { isAdmin } from "../../../../../server/auth.js";
+import { questionnaireRecipients } from "../../../../../server/coverage.js";
 import { editorPage } from "../../../../../server/regions.js";
 
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
 let page = null;
+let recipients = [];
 let loadError = false;
 if (authenticated) {
-  try { page = await editorPage(Astro.params.slug, Astro.params.id); }
+  try { page = await editorPage(Astro.params.slug, Astro.params.id); if (page) recipients = await questionnaireRecipients(Astro.params.slug, Astro.params.id); }
   catch { loadError = true; }
 }
 if (authenticated && !loadError && !page) return new Response("Questionnaire not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -29,7 +31,7 @@ const questionnaire = page?.questionnaire;
         {questionnaire.risk_id ? <p class="notice"><strong>{questionnaire.risk_id}</strong> · {questionnaire.risk_title}</p> : <p class="notice">This existing questionnaire has no risk yet. Link it from the country page.</p>}
         <h1>{questionnaire.topic}</h1>
         <p class="muted">Opened {questionnaire.opened} · {region.name}</p>
-        {questionnaire.sent && <p class="notice" role="status">Sent on {questionnaire.sent} to the experts for {region.name}.</p>}
+        {questionnaire.sent && <p class="notice" role="status">First invitations created on {questionnaire.sent}. Questions are locked; additional recipients and return links can be selected below.</p>}
         {error === "options" && <p class="notice error" role="alert">Multiple choice needs at least two options, one per line.</p>}
         {error === "question" && <p class="notice error" role="alert">Check the question and try again.</p>}
         {error === "send" && <p class="notice error" role="alert">Add at least one question before sending.</p>}
@@ -77,15 +79,16 @@ const questionnaire = page?.questionnaire;
           </form>
         )}
 
-        {!questionnaire.sent && (
-          <form method="post" action="/api/admin/questionnaire-editor">
-            <input type="hidden" name="region" value={region.slug} />
-            <input type="hidden" name="questionnaire" value={questionnaire.id} />
-            <input type="hidden" name="action" value="send" />
-            <div class="actions"><button type="submit">Send</button></div>
-            <p class="muted">Assigns this questionnaire to the {page.contacts} experts for {region.name}.</p>
-          </form>
-        )}
+        <section class="card"><h2>Recipients and invitation links</h2>
+          <p>Choose active experts covering {region.name}{questionnaire.risk_id ? ` and ${questionnaire.risk_id}` : ''}. Existing recipients can receive fresh links even after their coverage changes. Answers are preserved.</p>
+          <p><a href="/admin/users">Manage experts and their country/risk coverage →</a></p>
+          {error === 'recipients' && <p class="notice error">Choose recipients below to generate invitation links.</p>}
+          {!recipients.length ? <p class="notice">No eligible experts. Add this country and risk coverage to a user profile, then return here.</p> : <form method="post" action={`/admin/regions/${region.slug}/questionnaires/${questionnaire.id}/invitations`}>
+            <fieldset><legend>Expert recipients</legend>{recipients.map((expert) => <label class="choice"><input type="checkbox" name="recipients" value={expert.id} />{expert.pseudonym} · {expert.submitted_at ? 'Submitted' : expert.updated_at ? 'In progress' : expert.assignment_id ? 'Assigned' : 'Not assigned'}{!expert.currently_eligible && ' · Existing assignment outside current coverage'}</label>)}</fieldset>
+            <div class="actions"><button disabled={!questionnaire.sent && !questionnaire.questions.length}>Generate invitation links</button></div>
+            {!questionnaire.sent && !questionnaire.questions.length && <p class="muted">Add at least one question first.</p>}
+          </form>}
+        </section>
       </>
     )}
   </AdminAccess>

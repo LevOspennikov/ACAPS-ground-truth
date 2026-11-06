@@ -1,5 +1,5 @@
 import { redirect, textField } from "../../../server/forms.js";
-import { addQuestion, denyUnlessAdmin, removeQuestion, sendQuestionnaire } from "../../../server/regions.js";
+import { addQuestion, denyUnlessAdmin, removeQuestion } from "../../../server/regions.js";
 
 const types = ["single", "text"];
 
@@ -31,13 +31,7 @@ export async function POST({ request, cookies }) {
     return back(region, questionnaire);
   }
 
-  if (action === "send") {
-    const sent = await sendQuestionnaire(region, questionnaire);
-    if (!sent) return back(region, questionnaire, "locked");
-    if (sent.error === "questions") return back(region, questionnaire, "send");
-    if (sent.error === "contacts") return back(region, questionnaire, "contacts");
-    return back(region, questionnaire);
-  }
+  if (action === "send") return back(region, questionnaire, "recipients");
 
   if (action !== "add") return redirect("/admin");
   let prompt;

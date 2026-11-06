@@ -1,0 +1,34 @@
+---
+import AdminLayout from '../../../../../../layouts/AdminLayout.astro';
+import { configured } from '../../../../../../server/db.js';
+import { isAdmin } from '../../../../../../server/auth.js';
+import { sameOrigin, reject } from '../../../../../../server/forms.js';
+import { editorPage } from '../../../../../../server/regions.js';
+import { questionnaireRecipients } from '../../../../../../server/coverage.js';
+import { inviteQuestionnaireRecipients } from '../../../../../../server/invitations.js';
+const back = `/admin/regions/${encodeURIComponent(Astro.params.slug)}/questionnaires/${encodeURIComponent(Astro.params.id)}`;
+if (Astro.request.method !== 'POST') return Astro.redirect(back, 303);
+if (!sameOrigin(Astro.request)) return reject('Forbidden', 403);
+if (!configured() || !isAdmin(Astro.cookies)) return reject('Forbidden', 403);
+let page = null; let invitations = []; let error = '';
+try {
+  page = await editorPage(Astro.params.slug, Astro.params.id);
+  if (!page) return reject('Questionnaire not found.', 404);
+  const form = await Astro.request.formData();
+  const recipients = await questionnaireRecipients(Astro.params.slug, Astro.params.id);
+  invitations = await inviteQuestionnaireRecipients(Astro.params.slug, Astro.params.id, form.getAll('recipients'));
+  invitations = invitations.map((invitation) => ({ ...invitation, pseudonym: recipients.find((r) => r.id === invitation.id)?.pseudonym || 'Selected expert' }));
+} catch (failure) {
+  const messages = ['Choose between 1 and 50 recipients.', 'Recipients are no longer eligible, or the questionnaire has no questions. Refresh the questionnaire and try again.', 'Could not create invitations. Nothing was saved; please retry.'];
+  error = messages.includes(failure.message) ? failure.message : 'Could not load invitations. Check the database setup and retry.';
+  Astro.response.status = error.startsWith('Choose') || error.startsWith('Recipients') ? 400 : 503;
+}
+---
+<AdminLayout title="Questionnaire invitations"><a href={back}>← Back to questionnaire</a><h1>{error ? 'Invitations could not be created' : 'Invitation links ready'}</h1>
+  {error ? <p class="notice error" role="alert">{error}</p> : <>
+    <h2>{page.questionnaire.topic}</h2><p>Copy these links now and share each with its intended expert. Each link works once and expires in 48 hours. Email delivery is not automatic.</p>
+    <p class="notice">Assignments and answers are preserved. Earlier unused links for these assignments have been replaced. The questionnaire’s questions are now locked.</p>
+    {invitations.map((invitation) => <section class="card"><h3>{invitation.pseudonym}</h3><a class="linkbox" href={`/invite?token=${invitation.token}`}>{Astro.url.origin}/invite?token={invitation.token}</a></section>)}
+    <p class="muted">Links are shown only in this response. Return to the questionnaire to generate new ones if needed.</p>
+  </>}
+</AdminLayout>
