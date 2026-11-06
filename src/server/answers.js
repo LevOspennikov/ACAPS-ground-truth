@@ -24,3 +24,34 @@ export function answerLabel(question, value) {
   const index = question.options.findIndex((_, i) => value === `${question.id}-${i}`);
   return question.options[index] ?? 'No answer provided';
 }
+
+function parseJson(value) {
+  if (typeof value !== 'string') return value;
+  try { return JSON.parse(value); } catch { return null; }
+}
+
+function storedAnswers(stored) {
+  const parsed = parseJson(stored);
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+}
+
+function questionOptions(question) {
+  if (Array.isArray(question.options)) return question.options;
+  return String(question.options || '').split('\n').filter(Boolean);
+}
+
+// Turn a stored response into the prompts and chosen labels an admin can read.
+export function describeAnswers(questions, stored) {
+  const answers = storedAnswers(stored);
+  const parsedList = parseJson(questions);
+  const parsed = Array.isArray(parsedList) ? parsedList : [];
+  if (!parsed.length) {
+    return Object.entries(answers)
+      .filter(([, value]) => String(value || '').trim())
+      .map(([, value]) => ({ prompt: 'Answer', value: String(value) }));
+  }
+  return parsed.map((question) => ({
+    prompt: question.prompt || 'Question',
+    value: answerLabel({ ...question, type: question.type || 'text', options: questionOptions(question) }, String(answers[question.id] ?? '')),
+  }));
+}
