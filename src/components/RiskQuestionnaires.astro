@@ -1,29 +1,98 @@
 ---
-import { riskRadarFields, riskRadarSummaryKeys } from '../data/risk-radar-fields.js';
-const { region } = Astro.props;
+import { riskRadarFields, riskRadarSummaryKeys } from "../data/risk-radar-fields.js";
+
+const { region, view = "pick" } = Astro.props;
 const risk = region.selectedRisk;
-const current = region.questionnaires.filter((q) => !q.sent);
-const sent = region.questionnaires.filter((q) => q.sent);
-const summaryFields = riskRadarSummaryKeys.filter((key) => key !== 'country').map((key) => riskRadarFields.find((f) => f.key === key));
-const additionalFields = riskRadarFields.filter((f) => !riskRadarSummaryKeys.includes(f.key));
+const current = region.questionnaires.filter((item) => !item.sent);
+const sent = region.questionnaires.filter((item) => item.sent);
+const summaryFields = riskRadarSummaryKeys.filter((key) => key !== "country").map((key) => riskRadarFields.find((field) => field.key === key));
+const additionalFields = riskRadarFields.filter((field) => !riskRadarSummaryKeys.includes(field.key));
+const questionnairesHref = (riskId) => `/admin/regions/${region.slug}/questionnaires?risk=${encodeURIComponent(riskId)}`;
 ---
-<section aria-labelledby="risk-heading">
-  <h2 id="risk-heading">Risks in {region.name}</h2>
-  {region.risks.length ? <form class="search" method="get" action="/admin"><input type="hidden" name="country" value={region.slug} /><label for="risk">Select a risk</label><select id="risk" name="risk" required>{region.risks.map((r) => <option value={r.risk_id} selected={risk?.risk_id === r.risk_id}>{r.risk_id} · {r.risk_title}</option>)}</select><button>Show questionnaires</button></form> : <p class="notice">No risks for this country yet. Add one below.</p>}
-  {region.risks.length > 0 && !risk && <p class="notice error" role="alert">The selected risk does not belong to this country. Choose a risk above.</p>}
-  {risk && <>
-    <article class="card"><p class="eyebrow">{risk.risk_id} · {region.name}</p><h2>{risk.risk_title}</h2><p>{risk.risk_type || 'Type not specified'} · {risk.status || 'Status not specified'}</p><p class="muted">Probability: {risk.probability || '—'} · Risk level: {risk.risk_level || '—'}</p>
-      {risk.rationale && <p>{risk.rationale.length > 300 ? risk.rationale.slice(0, 300) + '…' : risk.rationale}</p>}
-      <details><summary>Full risk context and sources</summary><dl class="risk-fields">{riskRadarFields.map((f) => <div><dt>{f.label}</dt><dd class="answer-context">{risk[f.key] || '—'}</dd></div>)}</dl></details>
-    </article>
-    <section class="card"><h2>Questionnaires for {risk.risk_id}</h2>
-      <h3>In progress</h3>{!current.length && <p>No draft questionnaires for this risk.</p>}
-      <ul>{current.map((q) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${q.id}`}>{q.topic}</a> · opened {q.opened}</li>)}</ul>
-      <h3>Sent</h3>{!sent.length && <p>No sent questionnaires for this risk.</p>}
-      <ul>{sent.map((q) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${q.id}`}>{q.topic}</a> · sent {q.sent}</li>)}</ul>
-      <form method="post" action="/api/admin/region-questionnaire"><h3>Build a questionnaire for this risk</h3><input type="hidden" name="region" value={region.slug} /><input type="hidden" name="risk" value={risk.risk_id} /><label for="topic">Topic</label><input id="topic" name="topic" maxlength="180" required /><div class="actions"><button>Create questionnaire</button></div></form>
-    </section>
-  </>}
-  {region.unlinked.length > 0 && <details class="card"><summary>Existing questionnaires without a risk ({region.unlinked.length})</summary><p>Choose the appropriate risk in {region.name} to connect these questionnaires. Existing questions and answers are preserved.</p>{region.unlinked.map((q) => <form class="card" method="post" action="/api/admin/questionnaire-risk"><h3>{q.title}</h3><input type="hidden" name="region" value={region.slug} /><input type="hidden" name="questionnaire" value={q.id} /><label for={`link-${q.id}`}>Risk</label><select id={`link-${q.id}`} name="risk" required>{region.risks.map((r) => <option value={r.risk_id}>{r.risk_id} · {r.risk_title}</option>)}</select><div class="actions"><button disabled={!region.risks.length}>Link questionnaire</button></div></form>)}</details>}
-  <details class="card" id="add-risk"><summary>Add another risk in {region.name}</summary><form method="post" action="/api/admin/region-risk"><input type="hidden" name="region" value={region.slug} /><p class="muted">Country is fixed to {region.name}. Risk ID and title are required; remaining fields are optional.</p>{summaryFields.map((f) => <><label for={`new-${f.key}`}>{f.label}{f.required ? ' *' : ''}</label>{f.max > 1000 ? <textarea id={`new-${f.key}`} name={f.key} maxlength={f.max} required={f.required} /> : <input id={`new-${f.key}`} name={f.key} maxlength={f.max} required={f.required} />}</>)}<details><summary>Additional export fields</summary>{additionalFields.map((f) => <><label for={`new-${f.key}`}>{f.label}</label>{f.max > 1000 ? <textarea id={`new-${f.key}`} name={f.key} maxlength={f.max} /> : <input id={`new-${f.key}`} name={f.key} maxlength={f.max} />}</>)}</details><div class="actions"><button>Add risk</button></div></form></details>
-</section>
+
+{view === "pick" ? (
+  <section aria-labelledby="risk-heading">
+    <h2 id="risk-heading">Risks in {region.name}</h2>
+    {region.risks.length ? (
+      <nav class="region-grid" aria-label="Risks">
+        {region.risks.map((item) => (
+          <a class="region-link" href={questionnairesHref(item.risk_id)}>{item.risk_id} · {item.risk_title}</a>
+        ))}
+      </nav>
+    ) : <p class="notice">No risks for this country yet. Add one below.</p>}
+    {region.unlinked.length > 0 && (
+      <details class="card">
+        <summary>Existing questionnaires without a risk ({region.unlinked.length})</summary>
+        <p>Choose the appropriate risk in {region.name} to connect these questionnaires. Existing questions and answers are preserved.</p>
+        {region.unlinked.map((item) => (
+          <form class="card" method="post" action="/api/admin/questionnaire-risk">
+            <h3>{item.title}</h3>
+            <input type="hidden" name="region" value={region.slug} />
+            <input type="hidden" name="questionnaire" value={item.id} />
+            <label for={`link-${item.id}`}>Risk</label>
+            <select id={`link-${item.id}`} name="risk" required>
+              {region.risks.map((itemRisk) => <option value={itemRisk.risk_id}>{itemRisk.risk_id} · {itemRisk.risk_title}</option>)}
+            </select>
+            <div class="actions"><button disabled={!region.risks.length}>Link questionnaire</button></div>
+          </form>
+        ))}
+      </details>
+    )}
+    <details class="card" id="add-risk">
+      <summary>Add another risk in {region.name}</summary>
+      <form method="post" action="/api/admin/region-risk">
+        <input type="hidden" name="region" value={region.slug} />
+        <p class="muted">Country is fixed to {region.name}. Risk ID and title are required; remaining fields are optional.</p>
+        {summaryFields.map((field) => (
+          <>
+            <label for={`new-${field.key}`}>{field.label}{field.required ? " *" : ""}</label>
+            {field.max > 1000 ? <textarea id={`new-${field.key}`} name={field.key} maxlength={field.max} required={field.required} /> : <input id={`new-${field.key}`} name={field.key} maxlength={field.max} required={field.required} />}
+          </>
+        ))}
+        <details>
+          <summary>Additional export fields</summary>
+          {additionalFields.map((field) => (
+            <>
+              <label for={`new-${field.key}`}>{field.label}</label>
+              {field.max > 1000 ? <textarea id={`new-${field.key}`} name={field.key} maxlength={field.max} /> : <input id={`new-${field.key}`} name={field.key} maxlength={field.max} />}
+            </>
+          ))}
+        </details>
+        <div class="actions"><button>Add risk</button></div>
+      </form>
+    </details>
+  </section>
+) : (
+  <section aria-labelledby="questionnaires-heading">
+    {region.risks.length > 0 && !risk && <p class="notice error" role="alert">That risk does not belong to this country.</p>}
+    {risk && (
+      <>
+        <p class="eyebrow">{risk.risk_id} · {region.name}</p>
+        <h1 id="questionnaires-heading">{risk.risk_title}</h1>
+        <p>{risk.risk_type || "Type not specified"} · {risk.status || "Status not specified"}</p>
+        <p class="muted">Probability: {risk.probability || "—"} · Risk level: {risk.risk_level || "—"}</p>
+        <section class="card">
+          <h2>Questionnaires</h2>
+          <h3>In progress</h3>
+          {!current.length && <p>No draft questionnaires for this risk.</p>}
+          <ul>
+            {current.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · opened {item.opened}</li>)}
+          </ul>
+          <h3>Sent</h3>
+          {!sent.length && <p>No sent questionnaires for this risk.</p>}
+          <ul>
+            {sent.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent}</li>)}
+          </ul>
+          <form method="post" action="/api/admin/region-questionnaire">
+            <h3>Build a questionnaire for this risk</h3>
+            <input type="hidden" name="region" value={region.slug} />
+            <input type="hidden" name="risk" value={risk.risk_id} />
+            <label for="topic">Topic</label>
+            <input id="topic" name="topic" maxlength="180" required />
+            <div class="actions"><button>Create questionnaire</button></div>
+          </form>
+        </section>
+      </>
+    )}
+  </section>
+)}

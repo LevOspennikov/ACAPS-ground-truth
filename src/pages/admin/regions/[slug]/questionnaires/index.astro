@@ -1,0 +1,35 @@
+---
+import Layout from "../../../../../layouts/Layout.astro";
+import AdminAccess from "../../../../../components/AdminAccess.astro";
+import RiskQuestionnaires from "../../../../../components/RiskQuestionnaires.astro";
+import { configured } from "../../../../../server/db.js";
+import { isAdmin } from "../../../../../server/auth.js";
+import { regionBoard } from "../../../../../server/regions.js";
+
+const ready = configured();
+const authenticated = ready && isAdmin(Astro.cookies);
+const risk = (Astro.url.searchParams.get("risk") || "").slice(0, 40);
+let region = null;
+let loadError = false;
+if (authenticated) {
+  try { region = await regionBoard(Astro.params.slug, risk); }
+  catch { loadError = true; }
+}
+if (authenticated && !loadError && !region) return new Response("Country not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+if (authenticated && region && !risk && region.risks[0]) {
+  return Astro.redirect(`/admin/regions/${region.slug}/questionnaires?risk=${encodeURIComponent(region.risks[0].risk_id)}`);
+}
+---
+
+<Layout title={region?.selectedRisk ? `${region.selectedRisk.risk_id} questionnaires` : "Questionnaires"}>
+  <AdminAccess ready={ready} authenticated={authenticated}>
+    {loadError ? (
+      <p class="notice error" role="alert">Questionnaires could not be loaded.</p>
+    ) : region && (
+      <>
+        <p><a href={`/admin/regions/${region.slug}`}>Back to {region.name}</a></p>
+        <RiskQuestionnaires region={region} view="questionnaires" />
+      </>
+    )}
+  </AdminAccess>
+</Layout>
