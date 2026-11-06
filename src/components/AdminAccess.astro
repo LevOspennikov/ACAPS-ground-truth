@@ -5,7 +5,7 @@ const { ready, authenticated } = Astro.props;
 {!ready ? (
   <div class="notice">Set DATABASE_URL, ADMIN_PASSWORD and SESSION_SECRET, then apply db/schema.sql, before countries and questionnaires can be stored.</div>
 ) : !authenticated ? (
-  <form class="card" method="post" action="/api/admin/login">
+  <form class="card" method="post" action="/api/admin/login" data-astro-reload>
     <h2>Admin sign in</h2>
     {Astro.url.searchParams.get("error") === "login" && <p class="notice error" role="alert">Sign in failed. Check your password and try again.</p>}
     <label for="password">Admin password</label>

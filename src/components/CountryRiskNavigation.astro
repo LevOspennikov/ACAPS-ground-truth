@@ -1,0 +1,67 @@
+---
+import { ClientRouter } from 'astro:transitions';
+---
+
+<ClientRouter fallback="swap" />
+
+<script>
+  import { swapFunctions } from 'astro:transitions/client';
+
+  // Astro owns fetching, cancellation and history. Only selection changes on
+  // the same workspace use a smaller swap; searches and errors use its default.
+  const otherParams = (url) => {
+    const params = new URLSearchParams(url.search);
+    params.delete('country');
+    params.delete('risk');
+    params.sort();
+    return params.toString();
+  };
+  let selectionScroll = null;
+
+  document.addEventListener('astro:before-swap', (event) => {
+    selectionScroll = null;
+    const { from, to, newDocument } = event;
+    const panel = document.getElementById('country-risk-panel');
+    const nextPanel = newDocument.getElementById('country-risk-panel');
+    if (!panel || !nextPanel || from.origin !== to.origin ||
+        from.pathname !== to.pathname || from.hash || to.hash ||
+        otherParams(from) !== otherParams(to) ||
+        (from.searchParams.get('country') === to.searchParams.get('country') &&
+         from.searchParams.get('risk') === to.searchParams.get('risk'))) return;
+
+    // No visual transition for country/risk selection, including native support.
+    event.viewTransition.ready.catch(() => {});
+    event.viewTransition.skipTransition();
+    event.swap = () => {
+      if (event.navigationType !== 'traverse') {
+        selectionScroll = { left: window.scrollX, top: window.scrollY, behavior: 'instant' };
+      }
+      const focusedLink = panel.contains(document.activeElement)
+        ? document.activeElement.closest('a')?.getAttribute('href') : null;
+      swapFunctions.deselectScripts(newDocument);
+      swapFunctions.swapRootAttributes(newDocument);
+      swapFunctions.swapHeadElements(newDocument);
+      panel.replaceWith(nextPanel);
+      // A normal body swap removes the previous announcer. Match that cleanup
+      // before Astro creates the next one for this navigation.
+      document.querySelectorAll('.astro-route-announcer').forEach((node) => node.remove());
+      const selectedCountries = new Set([...newDocument.querySelectorAll('#country-selection a[aria-current]')]
+        .map((link) => link.href));
+      for (const link of document.querySelectorAll('#country-selection a')) {
+        if (selectedCountries.has(link.href)) link.setAttribute('aria-current', 'page');
+        else link.removeAttribute('aria-current');
+      }
+      if (focusedLink) {
+        [...nextPanel.querySelectorAll('a')]
+          .find((link) => link.getAttribute('href') === focusedLink)?.focus({ preventScroll: true });
+      }
+    };
+  });
+
+  document.addEventListener('astro:after-swap', () => {
+    // Astro resets scroll after the swap. Restore selection clicks here, while
+    // leaving Back/Forward's stored scroll restoration entirely to the router.
+    if (selectionScroll) window.scrollTo(selectionScroll);
+    selectionScroll = null;
+  });
+</script>
