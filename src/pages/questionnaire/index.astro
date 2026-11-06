@@ -1,0 +1,21 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { configured } from '../../server/db.js';
+import { expertAssignment } from '../../server/auth.js';
+const assignment = configured() ? await expertAssignment(Astro.cookies) : null;
+---
+<Layout title="Questionnaire">
+  <p class="eyebrow">YOUR EXPERT PERSPECTIVE</p>
+  {!assignment ? <><h1>Your invitation starts here.</h1><p>Open the private link provided by your organiser to access your assigned questionnaire. If your session has expired, ask for a new invitation.</p><a href="/">Return home</a></> : <>
+    <h1>{assignment.title}</h1><p class="intro">{assignment.description}</p>
+    <p class="muted">About 3 minutes · Synthetic pilot · Your identity is never shown publicly.</p>
+    {assignment.submitted_at ? <div class="notice" role="status"><h2>Thank you. Your response is submitted.</h2><p>No further edits are needed. Group summaries are not shared with experts in this prototype.</p></div> : <>
+    {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Progress saved on the server. You can return in this browser within 7 days of opening your invitation.</p>}
+    <form method="post" action="/api/expert/respond">
+      <fieldset><legend>1. How likely is this risk?</legend><p class="muted">Choose one rating, from very unlikely to very likely.</p>{['Very unlikely', 'Unlikely', 'Neither likely nor unlikely', 'Likely', 'Very likely'].map((label, i) => <label class="choice"><input type="radio" name="likelihood" value={i + 1} checked={assignment.likelihood === i + 1} />{i + 1} — {label}</label>)}</fieldset>
+      <fieldset><legend>2. How confident are you in your assessment?</legend>{['Very low', 'Low', 'Moderate', 'High', 'Very high'].map((label, i) => <label class="choice"><input type="radio" name="confidence" value={i + 1} checked={assignment.confidence === i + 1} />{i + 1} — {label}</label>)}</fieldset>
+      <fieldset><legend>3. What context would help? (optional)</legend><label for="context">Evidence, information gaps, or a different perspective</label><textarea id="context" name="context" maxlength="4000">{assignment.context || ''}</textarea><small>Avoid names, contact details, or information that could identify you or others.</small></fieldset>
+      <p>Both ratings are needed to submit. You can save an incomplete response.</p><div class="actions"><button name="intent" value="save" class="secondary">Save progress</button><button name="intent" value="submit">Submit response</button></div>
+    </form></>}
+  </>}
+</Layout>

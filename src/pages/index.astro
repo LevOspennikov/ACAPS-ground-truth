@@ -1,0 +1,15 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { configured } from '../server/db.js';
+---
+<Layout>
+  <p class="eyebrow">HUMANITARIAN RISK VALIDATION</p>
+  <h1>A few minutes.<br />A clearer picture.</h1>
+  <p class="intro">Bring expert judgement closer to humanitarian analysis. Review a risk, share your perspective, and help identify what needs a second look.</p>
+  {!configured() && <div class="notice">Deployment is running. Complete the environment variables and database setup in the README to enable questionnaires.</div>}
+  <div class="grid">
+    <section class="card"><h2>For experts</h2><p>Use the private invitation link shared by your organiser. Save your progress and return before you submit.</p><a href="/questionnaire">Open my questionnaire →</a></section>
+    <section class="card"><h2>For organisers</h2><p>Create a questionnaire, share a synthetic expert invitation, and follow completion and grouped ratings.</p><a class="button" href="/admin">Open admin</a></section>
+  </div>
+  <p class="muted">Deployment prototype · Three short questions · No email service required</p>
+</Layout>

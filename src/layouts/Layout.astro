@@ -1,0 +1,13 @@
+---
+import '../styles/global.css';
+const { title = 'Ground Truth' } = Astro.props;
+---
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>{title} · ACAPS</title></head>
+  <body>
+    <header><a class="brand" href="/">ACAPS <span>Ground Truth</span></a><span class="badge">PROTOTYPE</span></header>
+    <main><slot /></main>
+    <footer>Synthetic data only · Humanitarian insight, informed by people.</footer>
+  </body>
+</html>

@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+const invitation = Astro.url.searchParams.get('token');
+const valid = invitation && /^[a-f0-9]{64}$/.test(invitation);
+---
+<Layout title="Expert invitation"><p class="eyebrow">PRIVATE EXPERT INVITATION</p><h1>Your perspective matters.</h1>
+  {valid ? <form class="card" method="post" action="/api/expert/accept"><h2>Open your questionnaire</h2><p>This single-use invitation establishes a private session in this browser for seven days. Only open it on a device you trust.</p><input type="hidden" name="token" value={invitation} /><button>Accept invitation</button></form> : <p>This invitation is invalid. Ask your organiser for a new link.</p>}
+</Layout>

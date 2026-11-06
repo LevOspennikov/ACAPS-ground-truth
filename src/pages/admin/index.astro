@@ -1,0 +1,41 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { configured, db } from '../../server/db.js';
+import { isAdmin } from '../../server/auth.js';
+const ready = configured();
+const authenticated = ready && isAdmin(Astro.cookies);
+let questionnaires = [];
+if (authenticated) {
+  questionnaires = await db()`SELECT q.id, q.title, count(a.id)::int AS invited,
+    count(r.submitted_at)::int AS submitted, count(r.assignment_id)::int AS started,
+    round(avg(r.likelihood) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS likelihood,
+    round(avg(r.confidence) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS confidence
+    FROM questionnaires q LEFT JOIN assignments a ON a.questionnaire_id = q.id
+    LEFT JOIN responses r ON r.assignment_id = a.id GROUP BY q.id ORDER BY q.created_at DESC`;
+}
+const invitation = Astro.cookies.get('new-invitation')?.value;
+if (invitation) Astro.cookies.delete('new-invitation', { path: '/admin' });
+---
+<Layout title="Admin">
+  <p class="eyebrow">ORGANISER WORKSPACE</p><h1>Small signals.<br />Shared understanding.</h1>
+  {!ready ? <div class="notice">Set DATABASE_URL, ADMIN_PASSWORD and SESSION_SECRET, then apply db/schema.sql. See README.md.</div> : !authenticated ?
+    <form class="card" method="post" action="/api/admin/login"><h2>Admin sign in</h2>
+      {Astro.url.searchParams.has('error') && <p class="notice error" role="alert">Sign in failed. Check your password and try again.</p>}
+      <label for="password">Admin password</label><input id="password" name="password" type="password" required autocomplete="current-password" maxlength="256" />
+      <div class="actions"><button>Sign in</button></div><p class="muted">Use the ADMIN_PASSWORD configured for this deployment.</p>
+    </form> : <>
+    <form method="post" action="/api/admin/logout"><button class="secondary">Sign out</button></form>
+    {invitation && <div class="notice"><strong>Expert invitation ready</strong><p>Copy this link now. It expires in 48 hours and works once. Opening it creates a 7-day session on that browser.</p><a class="linkbox" href={`/invite?token=${invitation}`}>{Astro.url.origin}/invite?token={invitation}</a></div>}
+    <section><h2>Questionnaires</h2><p class="muted">Synthetic participants only. Results include submitted responses; free-text answers are withheld from this initial dashboard.</p>
+      {!questionnaires.length && <div class="card">No questionnaires yet. Create your first one below.</div>}
+      {questionnaires.map((q) => <article class="card"><h2>{q.title}</h2><p>{q.submitted} submitted · {q.started - q.submitted} in progress · {q.invited} assigned</p>
+        <p>Average likelihood: <strong>{q.likelihood ?? '—'}/5</strong> · confidence: <strong>{q.confidence ?? '—'}/5</strong></p>
+        <form method="post" action="/api/admin/invite"><input type="hidden" name="questionnaire" value={q.id} /><button class="secondary">Create another expert invitation</button></form>
+      </article>)}
+    </section>
+    <form class="card" method="post" action="/api/admin/create"><h2>Create a questionnaire</h2><p>Each questionnaire asks about likelihood, confidence, and optional context.</p>
+      <label for="title">Risk title</label><input id="title" name="title" required maxlength="180" value="Demo: disruption to humanitarian access" />
+      <label for="context">Risk description</label><textarea id="context" name="context" required maxlength="4000">Synthetic scenario: access constraints could disrupt humanitarian assistance over the next three months. How likely is this in your assessment?</textarea>
+      <div class="actions"><button>Create & generate expert link</button></div>
+    </form></>}
+</Layout>

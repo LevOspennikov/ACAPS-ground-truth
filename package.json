@@ -1,0 +1,31 @@
+{
+  "name": "acaps-ground-truth",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.4"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "db:setup": "node --env-file=.env scripts/setup-db.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@astrojs/vercel": "11.0.20",
+    "@neondatabase/serverless": "1.2.0",
+    "astro": "7.4.7"
+  },
+  "overrides": {
+    "@vercel/nft": {
+      "glob": "^14.0.2"
+    },
+    "glob": {
+      "minimatch": "^11.0.1"
+    },
+    "@vercel/routing-utils": {
+      "path-to-regexp": "6.3.0"
+    }
+  }
+}
