@@ -21,24 +21,6 @@ const riskHref = (riskId) => links === "overview"
       ))}
     </nav>
   ) : <p class="notice">No risks for this country yet. Add one below.</p>}
-  {region.unlinked.length > 0 && (
-    <details class="card">
-      <summary>Existing questionnaires without a risk ({region.unlinked.length})</summary>
-      <p>Choose the appropriate risk in {region.name} to connect these questionnaires. Existing questions and answers are preserved.</p>
-      {region.unlinked.map((item) => (
-        <form class="card" method="post" action="/api/admin/questionnaire-risk" data-astro-reload>
-          <h3>{item.title}</h3>
-          <input type="hidden" name="region" value={region.slug} />
-          <input type="hidden" name="questionnaire" value={item.id} />
-          <label for={`link-${item.id}`}>Risk</label>
-          <select id={`link-${item.id}`} name="risk" required>
-            {region.risks.map((itemRisk) => <option value={itemRisk.risk_id}>{itemRisk.risk_id} · {itemRisk.risk_title}</option>)}
-          </select>
-          <div class="actions"><button disabled={!region.risks.length}>Link questionnaire</button></div>
-        </form>
-      ))}
-    </details>
-  )}
   <details class="card" id="add-risk">
     <summary>Add another risk in {region.name}</summary>
     <form method="post" action="/api/admin/region-risk" data-astro-reload>

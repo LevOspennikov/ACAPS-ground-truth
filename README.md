@@ -53,7 +53,9 @@ The authenticated `/admin` page is organized by country. Every imported country 
 
 The initial catalog retains all ten original CSV records and adds two Chad records: `R0233` and `R1043` (source data records 14 and 15). The seed now covers Afghanistan, Algeria, Bangladesh, Burundi and Chad, with 12 risks total. All 25 export fields remain intact. The original root CSV is unchanged and not required at runtime.
 
-`risk_radar.region_slug` links risks to country regions, and `questionnaires.risk_id` links questionnaires to risks. `db/country-risk.sql` applies these additive schema changes and relaxes the old source-row limit. Existing risks get country links without overwriting their contents. Existing questionnaires without a risk stay available in an expandable section so admins can explicitly link them; their questions and answers are preserved.
+`risk_radar.region_slug` links risks to country regions, and `questionnaires.risk_id` links questionnaires to risks. `db/country-risk.sql` applies these additive schema changes and relaxes the old source-row limit. Existing risks get country links without overwriting their contents. Country questionnaires are linked to their selected risk at creation; there is no legacy questionnaire relinking flow.
+
+Country boards batch their region, risk and questionnaire reads into one read-only Neon HTTP transaction. The country page includes contacts in that batch; the overview skips them and loads its country list concurrently when a country is explicitly selected. Opening the overview without a selection first loads the country list to choose its initial country.
 
 Add risks from the selected country's expandable form. The server fixes the country from the stored region; changing a form field cannot move a risk into another country. Country contacts and reports remain accessible through the country page. `/admin/risk-radar` and `/radar` redirect to `/admin`; the old catalog POST endpoint is retired.
 

@@ -16,9 +16,12 @@ const PageLayout = authenticated ? AdminLayout : Layout;
 let regions = []; let selected = null; let failed = false;
 if (authenticated) {
   try {
-    regions = await listRegions(search);
-    const slug = country || regions[0]?.slug;
-    if (slug) selected = await regionBoard(slug, risk);
+    if (country) {
+      [regions, selected] = await Promise.all([listRegions(search), regionBoard(country, risk)]);
+    } else {
+      regions = await listRegions(search);
+      if (regions[0]) selected = await regionBoard(regions[0].slug, risk);
+    }
   } catch { failed = true; Astro.response.status = 503; }
 }
 ---
