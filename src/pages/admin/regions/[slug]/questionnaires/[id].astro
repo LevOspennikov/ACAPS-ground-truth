@@ -34,8 +34,6 @@ const questionnaire = page?.questionnaire;
         {questionnaire.sent && <p class="notice" role="status">First invitations created on {questionnaire.sent}. Questions are locked; additional recipients and return links can be selected below.</p>}
         {error === "options" && <p class="notice error" role="alert">Multiple choice needs at least two options, one per line.</p>}
         {error === "question" && <p class="notice error" role="alert">Check the question and try again.</p>}
-        {error === "send" && <p class="notice error" role="alert">Add at least one question before sending.</p>}
-        {error === "contacts" && <p class="notice error" role="alert">Add an expert for this country before sending.</p>}
         {error === "locked" && <p class="notice error" role="alert">This questionnaire has already been sent.</p>}
 
         <h2>Questions</h2>
@@ -82,7 +80,6 @@ const questionnaire = page?.questionnaire;
         <section class="card"><h2>Recipients and invitation links</h2>
           <p>Choose active experts covering {region.name}{questionnaire.risk_id ? ` and ${questionnaire.risk_id}` : ''}. Existing recipients can receive fresh links even after their coverage changes. Answers are preserved.</p>
           <p><a href="/admin/users">Manage experts and their country/risk coverage →</a></p>
-          {error === 'recipients' && <p class="notice error">Choose recipients below to generate invitation links.</p>}
           {!recipients.length ? <p class="notice">No eligible experts. Add this country and risk coverage to a user profile, then return here.</p> : <form method="post" action={`/admin/regions/${region.slug}/questionnaires/${questionnaire.id}/invitations`}>
             <fieldset><legend>Expert recipients</legend>{recipients.map((expert) => <label class="choice"><input type="checkbox" name="recipients" value={expert.id} />{expert.pseudonym} · {expert.submitted_at ? 'Submitted' : expert.updated_at ? 'In progress' : expert.assignment_id ? 'Assigned' : 'Not assigned'}{!expert.currently_eligible && ' · Existing assignment outside current coverage'}</label>)}</fieldset>
             <div class="actions"><button disabled={!questionnaire.sent && !questionnaire.questions.length}>Generate invitation links</button></div>

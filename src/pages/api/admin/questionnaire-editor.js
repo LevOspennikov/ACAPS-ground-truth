@@ -32,8 +32,6 @@ export async function POST({ request, cookies }) {
     return back(region, questionnaire);
   }
 
-  if (action === "send") return back(region, questionnaire, "recipients");
-
   if (action !== "add") return redirect("/admin");
   let prompt;
   let type;
