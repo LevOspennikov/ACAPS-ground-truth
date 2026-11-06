@@ -62,7 +62,6 @@ const question = questions[step];
   <body>
   {
       <form method="post" action="/questionnaire">
-        <p class="eyebrow">Expert review</p>
         <input type="hidden" name="current" value={step} />
         {questions.filter((item) => item.id !== question?.id).map((item) => (
           <input type="hidden" name={item.id} value={savedAnswer(item)} />
