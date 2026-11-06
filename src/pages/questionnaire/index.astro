@@ -1,119 +1,78 @@
 ---
-import "../../styles/expert.css";
-import questions from "../../data/questions.js";
+import '../../styles/expert.css';
+import { configured } from '../../server/db.js';
+import { expertAssignment } from '../../server/auth.js';
+import { saveResponse } from '../../server/responses.js';
+import { sameOrigin, reject } from '../../server/forms.js';
+import { validateAnswer, firstUnanswered, answerLabel } from '../../server/answers.js';
 
+if (Astro.request.method === 'POST' && !sameOrigin(Astro.request)) return reject('Forbidden', 403);
+let assignment = null;
+let loadFailed = false;
+try { assignment = configured() ? await expertAssignment(Astro.cookies) : null; }
+catch { loadFailed = true; Astro.response.status = 503; }
+if (!assignment && !loadFailed) Astro.response.status = 401;
+const questions = assignment?.questions || [];
+const answers = { ...(assignment?.answers || {}) };
 const total = questions.length;
-const visibilities = ["anonymous", "public"];
-
-const posted = Astro.request.method === "POST" ? await Astro.request.formData() : null;
-
-const read = (name) => {
-  const value = posted?.get(name);
-  return typeof value === "string" ? value.trim() : "";
-};
-
-const savedAnswer = (question) => {
-  const value = read(question.id);
-  if (!value) return "";
-  if (question.type === "single" && !question.options.some((_, index) => value === `${question.id}-${index}`)) return "";
-  return value.slice(0, 4000);
-};
-
-const currentRaw = Number(read("current") || "0");
-const current = Number.isInteger(currentRaw) && currentRaw >= 0 && currentRaw <= total ? currentRaw : 0;
-const stepRaw = posted?.get("step");
-let step = stepRaw == null || stepRaw === "" ? current : Number(stepRaw);
-if (!Number.isInteger(step) || step < 0 || step > total) step = current;
-
-let error = "";
-if (posted && step > current) {
-  const question = questions[current];
-  if (!savedAnswer(question)) {
-    step = current;
-    error = question.type === "text" ? "Write an answer to continue." : "Choose an answer to continue.";
+let step = assignment?.submitted_at ? total : Math.min(assignment?.progress_step || 0, total);
+let error = '';
+let saved = false;
+if (assignment && Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const current = Number(form.get('current'));
+  const intent = form.get('intent');
+  if (!Number.isInteger(current) || current < 0 || current > total || !['next', 'back', 'save', 'submit'].includes(intent)) return reject('Invalid questionnaire step.');
+  if (assignment.submitted_at) return Astro.redirect('/questionnaire', 303);
+  step = current;
+  try {
+    if (current < total) answers[questions[current].id] = validateAnswer(questions[current], form.get('answer') ?? '');
+    if (intent === 'next') {
+      if (questions[current]?.required !== false && !answers[questions[current]?.id]) throw new Error('Answer this question before continuing.');
+      step = Math.min(current + 1, total);
+    }
+    if (intent === 'back') step = Math.max(0, current - 1);
+    if (intent === 'submit') {
+      const missing = firstUnanswered(questions, answers);
+      if (missing < total) { step = missing; throw new Error('Answer all required questions before submitting.'); }
+      step = total;
+    }
+    const stored = await saveResponse(Astro.cookies, assignment.id, answers, step, intent === 'submit');
+    if (!stored) {
+      // Re-read state: a concurrent submission may already have locked answers.
+      const latest = await expertAssignment(Astro.cookies);
+      if (latest?.submitted_at) return Astro.redirect('/questionnaire', 303);
+      return reject('Your session ended or access was revoked. Ask your organiser for a fresh link.', 401);
+    }
+    return Astro.redirect(intent === 'save' ? '/questionnaire?saved=1' : '/questionnaire', 303);
+  } catch (failure) {
+    if (['Answer this question before continuing.', 'Answer all required questions before submitting.', 'Answers must be under 4,000 characters.', 'Choose a valid answer.'].includes(failure.message)) error = failure.message;
+    else { error = 'Could not save to the server. Your answer is still on this page; retry before closing it.'; Astro.response.status = 503; }
   }
 }
-
-const visibility = visibilities.includes(read("visibility")) ? read("visibility") : "";
-const alreadySubmitted = Astro.cookies.get("submitted")?.value === "1";
-let saved = alreadySubmitted;
-if (alreadySubmitted) step = total;
-if (posted && read("done") === "1" && !alreadySubmitted) {
-  step = total;
-  if (!visibility) {
-    error = "Choose anonymous or public.";
-    saved = false;
-  } else {
-    saved = true;
-    Astro.cookies.set("submitted", "1", { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 });
-  }
-}
-
+saved = Astro.url.searchParams.has('saved');
 const question = questions[step];
 ---
-
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Questionnaire</title>
-  </head>
-  <body>
-  {
-      <form method="post" action="/questionnaire">
+<html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>Questionnaire · ACAPS</title></head>
+<body>
+  <main class="expert-shell">
+    {!assignment ? <><h1>{loadFailed ? 'Your questionnaire is unavailable.' : 'Open your private invitation.'}</h1><p>{loadFailed ? 'We could not reach the server. Retry shortly.' : 'Use your organiser’s link to sign in. If your session expired or access was deactivated, ask for a new link.'}</p><a href="/">Return home</a></> : <>
+      <p class="muted">{assignment.crisis_title} · {assignment.country}</p><h1>{assignment.title}</h1><p>{assignment.description}</p>
+      <p class="muted">{assignment.profile_mode === 'anonymous' ? 'Anonymous profile: no name or email is stored.' : 'Named profile: your name and email are visible only to admins.'} Answers are never publicly attributed. Avoid identifying details in free text.</p>
+      {assignment.submitted_at ? <section class="notice" role="status"><h2>Thank you. Your response is submitted.</h2><p>Your answers are saved on the server and cannot be edited. A fresh invitation to this assignment will show this completion state.</p></section> : <form method="post" action="/questionnaire">
         <input type="hidden" name="current" value={step} />
-        {questions.filter((item) => item.id !== question?.id).map((item) => (
-          <input type="hidden" name={item.id} value={savedAnswer(item)} />
-        ))}
-        {step < total ? (
-          <>
-            <p class="muted">Question {step + 1} of {total}</p>
-            {question.type === "single" ? (
-              <fieldset>
-                <legend>{question.prompt}</legend>
-                {question.options.map((option, optionIndex) => {
-                  const value = `${question.id}-${optionIndex}`;
-                  return (
-                    <label class="choice">
-                      <input type="radio" name={question.id} value={value} required checked={savedAnswer(question) === value} />
-                      {option}
-                    </label>
-                  );
-                })}
-              </fieldset>
-            ) : (
-              <label for={question.id}>{question.prompt}</label>
-              <textarea id={question.id} name={question.id} rows="4" required maxlength="4000" placeholder={question.placeholder}>{savedAnswer(question)}</textarea>
-            )}
-            {error && <p class="notice error" role="alert">{error}</p>}
-            <div class="actions">
-              <button name="step" value={step + 1}>{step === total - 1 ? "Finish" : "Next"}</button>
-              {step > 0 && (
-                <button class="secondary" name="step" value={step - 1} formnovalidate>Back</button>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <h1>Thank you for participating</h1>
-            <fieldset>
-              <legend>Submit as</legend>
-              {visibilities.map((option) => (
-                <label class="choice">
-                  <input type="radio" name="visibility" value={option} required checked={visibility === option} disabled={saved} />
-                  {option.slice(0, 1).toUpperCase() + option.slice(1)}
-                </label>
-              ))}
-            </fieldset>
-            {error && <p class="notice error" role="alert">{error}</p>}
-            <div class="actions">
-              {saved ? <button type="button" disabled>Submit</button> : <button name="done" value="1">Submit</button>}
-              {!saved && <button class="secondary" name="step" value={total - 1} formnovalidate>Back</button>}
-            </div>
-          </>
-        )}
-      </form>
-  }
-  </body>
-</html>
+        {saved && <p class="notice" role="status">Progress saved on the server. Return in this browser within seven days, or ask your organiser for a fresh link to the same questionnaire.</p>}
+        {error && <p class="notice error" role="alert">{error}</p>}
+        {question ? <>
+          <p class="muted">Question {step + 1} of {total}</p>
+          {question.type === 'single' ? <fieldset><legend>{question.prompt}</legend>{question.options.map((option, i) => <label class="choice"><input type="radio" name="answer" value={`${question.id}-${i}`} checked={answers[question.id] === `${question.id}-${i}`} /> {option}</label>)}</fieldset> : <><label for="answer">{question.prompt}{question.required === false ? ' (optional)' : ''}</label><textarea id="answer" name="answer" rows="4" maxlength="4000" placeholder={question.placeholder}>{answers[question.id] || ''}</textarea></>}
+          <div class="actions">{step > 0 && <button class="secondary" name="intent" value="back">Back</button>}<button class="secondary" name="intent" value="save">Save progress</button><button name="intent" value="next">{step === total - 1 ? 'Review' : 'Next'}</button></div>
+        </> : <>
+          <h2>Review your answers</h2>{questions.map((q) => <section><h3>{q.prompt}</h3><p class="answer-context">{answerLabel(q, answers[q.id])}</p></section>)}
+          <p>Submitting saves your final answers on the server and locks them against further edits.</p><div class="actions"><button class="secondary" name="intent" value="back">Back</button><button class="secondary" name="intent" value="save">Save progress</button><button name="intent" value="submit">Submit response</button></div>
+        </>}
+      </form>}
+    </>}
+  </main>
+</body></html>

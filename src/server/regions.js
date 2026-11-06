@@ -54,11 +54,12 @@ export async function regionBoard(slug, riskId = "") {
   const unlinked = await sql`SELECT id, title FROM questionnaires WHERE (region_slug = ${slug} OR region_slug IS NULL) AND risk_id IS NULL ORDER BY created_at DESC`;
   const contacts = await sql`SELECT e.id, e.pseudonym AS name, e.focus,
     count(q.id)::int AS invited,
-    count(ans.assignment_id) FILTER (WHERE q.id IS NOT NULL)::int AS joined
+    count(a.id) FILTER (WHERE q.id IS NOT NULL AND (ans.assignment_id IS NOT NULL OR r.submitted_at IS NOT NULL))::int AS joined
     FROM experts e
     LEFT JOIN assignments a ON a.expert_id = e.id
     LEFT JOIN questionnaires q ON q.id = a.questionnaire_id AND q.region_slug = ${slug}
     LEFT JOIN questionnaire_answers ans ON ans.assignment_id = a.id
+    LEFT JOIN responses r ON r.assignment_id = a.id
     WHERE e.region_slug = ${slug}
     GROUP BY e.id
     ORDER BY e.pseudonym`;
@@ -104,12 +105,13 @@ export async function contactPage(slug, id) {
   const sql = db();
   const [contact] = await sql`SELECT e.id, e.pseudonym AS name, e.focus, g.slug, g.name AS region_name,
     count(q.id)::int AS invited,
-    count(ans.assignment_id) FILTER (WHERE q.id IS NOT NULL)::int AS joined
+    count(a.id) FILTER (WHERE q.id IS NOT NULL AND (ans.assignment_id IS NOT NULL OR r.submitted_at IS NOT NULL))::int AS joined
     FROM experts e
     JOIN regions g ON g.slug = e.region_slug
     LEFT JOIN assignments a ON a.expert_id = e.id
     LEFT JOIN questionnaires q ON q.id = a.questionnaire_id AND q.region_slug = ${slug}
     LEFT JOIN questionnaire_answers ans ON ans.assignment_id = a.id
+    LEFT JOIN responses r ON r.assignment_id = a.id
     WHERE e.id = ${id}::uuid AND e.region_slug = ${slug}
     GROUP BY e.id, g.slug, g.name`;
   if (!contact) return null;
@@ -197,14 +199,15 @@ export async function sendQuestionnaire(slug, questionnaireId) {
   const sql = db();
   const item = await openQuestionnaire(sql, slug, questionnaireId);
   if (!item || item.sent_at) return null;
-  const [{ count }] = await sql`SELECT count(*)::int AS count FROM questions WHERE questionnaire_id = ${questionnaireId}::uuid`;
-  if (!count) return { error: "questions" };
-  const experts = await sql`SELECT id FROM experts WHERE region_slug = ${slug}`;
+  const questionRows = await sql`SELECT id, type, prompt, options, placeholder FROM questions WHERE questionnaire_id = ${questionnaireId}::uuid ORDER BY position`;
+  if (!questionRows.length) return { error: "questions" };
+  const experts = await sql`SELECT id FROM experts WHERE region_slug = ${slug} AND active = true`;
   if (!experts.length) return { error: "contacts" };
-  const inserts = experts.map((expert) => sql`INSERT INTO assignments (id, questionnaire_id, expert_id) VALUES (${randomUUID()}, ${questionnaireId}::uuid, ${expert.id})`);
+  const snapshot = questionRows.map((question) => ({ ...question, options: question.type === "single" ? question.options.split("\n").filter(Boolean) : [] }));
+  const inserts = experts.map((expert) => sql`INSERT INTO assignments (id, questionnaire_id, expert_id) VALUES (${randomUUID()}, ${questionnaireId}::uuid, ${expert.id}) ON CONFLICT (questionnaire_id, expert_id) DO NOTHING`);
   await sql.transaction([
     ...inserts,
-    sql`UPDATE questionnaires SET sent_at = now() WHERE id = ${questionnaireId}::uuid AND sent_at IS NULL`,
+    sql`UPDATE questionnaires SET sent_at = now(), questions = ${JSON.stringify(snapshot)}::jsonb WHERE id = ${questionnaireId}::uuid AND sent_at IS NULL`,
   ]);
   return { recipients: experts.length };
 }

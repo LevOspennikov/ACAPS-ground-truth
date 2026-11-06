@@ -1,5 +1,6 @@
 ---
 import Layout from '../../layouts/Layout.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
 import AdminAccess from '../../components/AdminAccess.astro';
 import RiskQuestionnaires from '../../components/RiskQuestionnaires.astro';
 import { configured } from '../../server/db.js';
@@ -10,6 +11,7 @@ const authenticated = ready && isAdmin(Astro.cookies);
 const search = (Astro.url.searchParams.get('q') || '').trim().slice(0, 80);
 const country = (Astro.url.searchParams.get('country') || '').slice(0, 80);
 const risk = (Astro.url.searchParams.get('risk') || '').slice(0, 40);
+const PageLayout = authenticated ? AdminLayout : Layout;
 let regions = []; let selected = null; let failed = false;
 if (authenticated) {
   try {
@@ -19,9 +21,9 @@ if (authenticated) {
   } catch { failed = true; Astro.response.status = 503; }
 }
 ---
-<Layout title="Country risks">
+<PageLayout title="Country risks">
   <AdminAccess ready={ready} authenticated={authenticated}>
-    <div class="row"><div><p class="eyebrow">ACAPS GROUND TRUTH</p><h1>Country risks</h1></div><form method="post" action="/api/admin/logout"><button class="secondary">Sign out</button></form></div>
+    <div class="row"><div><p class="eyebrow">ACAPS GROUND TRUTH</p><h1>Country risks</h1></div></div>
     <p>Each region is one country. Choose a country, select a risk, then open or create a questionnaire for that risk.</p>
     {import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true' && <p class="notice error">Prototype mode: production deployments reset application data and restore the twelve imported risks. Manually added risks and questionnaires will be removed.</p>}
     {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Risk saved in the database.</p>}
@@ -33,4 +35,4 @@ if (authenticated) {
       {selected && <><h2>{selected.name}</h2><p><a href={`/admin/regions/${selected.slug}`}>Contacts and reports for {selected.name} →</a></p><RiskQuestionnaires region={selected} /></>}
     </>}
   </AdminAccess>
-</Layout>
+</PageLayout>

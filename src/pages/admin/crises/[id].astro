@@ -1,0 +1,20 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { configured } from '../../../server/db.js';
+import { isAdmin } from '../../../server/auth.js';
+import { categories, crisisDetail, validId } from '../../../server/management.js';
+if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
+let data = null; let groups = []; let failed = false;
+if (validId(Astro.params.id)) { try { [data, groups] = await Promise.all([crisisDetail(Astro.params.id), categories()]); } catch { failed = true; } }
+if (!data) Astro.response.status = failed ? 503 : 404;
+---
+<AdminLayout title="Crisis details"><a href="/admin/crises">← All crises</a>
+  {!data ? <><h1>{failed ? 'Crisis unavailable' : 'Crisis not found'}</h1><p>Return to the crisis list and try again.</p></> : <>
+    <h1>{data.crisis.title}</h1><p class="intro">{data.crisis.country} · {data.crisis.category_name} · {data.crisis.archived ? 'Archived' : 'Active'}</p>
+    <form class="card" method="post" action="/api/admin/manage/crisis-edit"><h2>Edit crisis</h2><input type="hidden" name="crisis" value={data.crisis.id} /><label for="title">Title</label><input id="title" name="title" value={data.crisis.title} required maxlength="180" /><label for="country">Country</label><input id="country" name="country" value={data.crisis.country} required maxlength="100" /><label for="category">Primary category</label><select id="category" name="category" required>{groups.filter((k) => !k.archived || k.id === data.crisis.category_id).map((k) => <option value={k.id} selected={k.id === data.crisis.category_id}>{k.name}{k.archived ? ' (archived)' : ''}</option>)}</select><label for="description">Description</label><textarea id="description" name="description" maxlength="4000">{data.crisis.description}</textarea><div class="actions"><button>Save crisis</button></div></form>
+    <section class="card"><h2>Crisis status</h2><p>Archiving prevents new questionnaires and assignments. Existing expert access, drafts and submissions remain available.</p><form method="post" action="/api/admin/manage/crisis-status"><input type="hidden" name="crisis" value={data.crisis.id} /><button class="secondary" name="archived" value={data.crisis.archived ? 'false' : 'true'}>{data.crisis.archived ? 'Restore crisis' : 'Archive crisis'}</button></form></section>
+    <h2>Questionnaires</h2>{!data.questionnaires.length && <p class="notice">No questionnaires in this crisis yet.</p>}
+    {data.questionnaires.map((q) => <article class="card"><h3>{q.title}</h3><p>{q.submitted} submitted / {q.assigned} assigned</p><div class="actions"><a href={`/admin/results/${q.id}`}>View answers and results →</a><a href="/admin/users">Assign through a user’s profile →</a></div></article>)}
+    {!data.crisis.archived && <form class="card" method="post" action="/api/admin/manage/questionnaire-create"><h2>Create questionnaire</h2><p class="muted">Uses a snapshot of the prompts defined in code. A question editor is outside this iteration.</p><input type="hidden" name="crisis" value={data.crisis.id} /><label for="questionnaire-title">Questionnaire title</label><input id="questionnaire-title" name="title" required maxlength="180" /><label for="context">Context for the expert</label><textarea id="context" name="context" required maxlength="4000">{data.crisis.description}</textarea><div class="actions"><button>Create questionnaire</button></div></form>}
+  </>}
+</AdminLayout>

@@ -1,28 +1,20 @@
 import { db } from './db.js';
 
-// Called only after admin authorization. Do not join expert identities here.
+// Never join expert identity fields into answer results.
 export async function questionnaireResults(id) {
   const sql = db();
-  const [questionnaire] = await sql`SELECT id, title, context FROM questionnaires WHERE id = ${id}`;
+  const [questionnaire] = await sql`SELECT q.*, coalesce(c.title, g.name, 'Questionnaire') AS crisis_title FROM questionnaires q LEFT JOIN crises c ON c.id = q.crisis_id LEFT JOIN regions g ON g.slug = q.region_slug WHERE q.id = ${id}`;
   if (!questionnaire) return null;
-
-  const [summary, distribution, responses] = await sql.transaction([
-    sql`SELECT count(a.id)::int AS assigned,
-      count(r.assignment_id) FILTER (WHERE r.submitted_at IS NULL)::int AS drafts,
-      count(r.submitted_at)::int AS submitted,
-      round(avg(r.likelihood) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS likelihood,
-      round(avg(r.confidence) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS confidence
-      FROM assignments a LEFT JOIN responses r ON r.assignment_id = a.id
-      WHERE a.questionnaire_id = ${id}`,
-    sql`SELECT r.likelihood, count(*)::int AS total FROM responses r
-      JOIN assignments a ON a.id = r.assignment_id
+  const [summary, distributions, responses] = await sql.transaction([
+    sql`SELECT count(a.id)::int AS assigned, count(r.assignment_id) FILTER (WHERE r.submitted_at IS NULL)::int AS drafts,
+      count(r.submitted_at)::int AS submitted FROM assignments a LEFT JOIN responses r ON r.assignment_id = a.id WHERE a.questionnaire_id = ${id}`,
+    sql`SELECT entry.key AS question_id, entry.value AS answer, count(*)::int AS total
+      FROM responses r JOIN assignments a ON a.id = r.assignment_id CROSS JOIN LATERAL jsonb_each_text(r.answers) entry
       WHERE a.questionnaire_id = ${id} AND r.submitted_at IS NOT NULL
-      GROUP BY r.likelihood ORDER BY r.likelihood`,
-    sql`SELECT r.likelihood, r.confidence, r.context FROM responses r
-      JOIN assignments a ON a.id = r.assignment_id
-      WHERE a.questionnaire_id = ${id} AND r.submitted_at IS NOT NULL
-      ORDER BY r.submitted_at DESC, r.assignment_id LIMIT 100`,
+      AND EXISTS(SELECT 1 FROM questionnaires q, jsonb_array_elements(q.questions) question WHERE q.id = ${id} AND question->>'id' = entry.key AND question->>'type' = 'single')
+      GROUP BY entry.key, entry.value`,
+    sql`SELECT r.answers FROM responses r JOIN assignments a ON a.id = r.assignment_id
+      WHERE a.questionnaire_id = ${id} AND r.submitted_at IS NOT NULL ORDER BY r.submitted_at DESC, r.assignment_id LIMIT 100`,
   ]);
-
-  return { questionnaire, summary: summary[0], distribution, responses };
+  return { questionnaire, summary: summary[0], distributions, responses };
 }
