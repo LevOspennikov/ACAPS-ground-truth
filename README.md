@@ -23,7 +23,15 @@ The homepage works without environment variables as a deployment smoke check. Da
 4. Apply `db/schema.sql` in that Neon database before testing the flow.
 5. Deploy. Redeploy whenever environment variables change.
 
-No Vercel CLI, `vercel.json`, Resend account, or separate backend host is needed. Frontend and backend code are separated within one deployment to keep this first setup small. Framework configuration follows the [Astro Vercel adapter documentation](https://docs.astro.build/en/guides/integrations-guide/vercel/).
+No Vercel CLI, Resend account, or separate backend host is needed for manual setup. `vercel.json` explicitly selects `npm run build` so the prototype database-reset hook runs when enabled. Frontend and backend code are separated within one deployment to keep this first setup small. Framework configuration follows the [Astro Vercel adapter documentation](https://docs.astro.build/en/guides/integrations-guide/vercel/).
+
+## Reset on prototype deployments
+
+Set `RESET_DATABASE_ON_DEPLOY=true` in Vercel's **Production** environment to start each production deployment with empty application tables recreated from `db/schema.sql`. This deletes questionnaires, synthetic experts, assignments, invitations, expert sessions, and answers. Admin credentials remain in Vercel environment variables. Integration-managed tables and the database itself are preserved.
+
+While this mode is enabled, edit `db/schema.sql` and push to `main` to deploy the new schema. Existing data is intentionally discarded. The reset runs after `astro build` succeeds, in one database transaction; if recreating the schema fails, the drops roll back and the build fails. A later Vercel deployment failure can still leave the existing live app using the reset database. Avoid overlapping deployments while prototyping.
+
+Local and Preview builds never trigger this reset. To stop deleting data, set `RESET_DATABASE_ON_DEPLOY=false` (or remove it) **before the next deployment**. Then use explicit, versioned migrations for changes to existing tables; normal setup does not alter existing tables.
 
 ## Test the prototype
 
