@@ -4,3 +4,8 @@ export function db() {
   if (!configured()) throw new Error('Application environment is not configured.');
   return neon(import.meta.env.DATABASE_URL);
 }
+
+export async function databaseVersion() {
+  const [response] = await db()`SELECT version()`;
+  return response.version;
+}
