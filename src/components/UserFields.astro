@@ -1,0 +1,9 @@
+---
+const { user = {} } = Astro.props;
+---
+<label for="pseudonym">Pseudonym</label><input id="pseudonym" name="pseudonym" required maxlength="100" value={user.pseudonym || ''} />
+<label for="profile_mode">Profile mode</label><select id="profile_mode" name="profile_mode"><option value="anonymous" selected={!user.profile_mode || user.profile_mode === 'anonymous'}>Anonymous — no identity stored</option><option value="named" selected={user.profile_mode === 'named'}>Named — identity visible only to admins</option></select>
+<p class="muted">For an anonymous profile, leave name and email empty. Use synthetic personal details in this prototype.</p>
+<label for="name">Name (named profiles only)</label><input id="name" name="name" maxlength="150" value={user.name || ''} autocomplete="off" />
+<label for="email">Email (named profiles only)</label><input id="email" name="email" type="email" maxlength="254" value={user.email || ''} autocomplete="off" />
+{user.profile_mode === 'named' && <label class="choice"><input type="checkbox" name="confirm_anonymous" value="yes" />If switching to anonymous: I have cleared name and email above and confirm that the stored identity will be permanently removed.</label>}

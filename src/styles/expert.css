@@ -11,3 +11,4 @@ textarea{width:100%;box-sizing:border-box;min-height:7rem;padding:.7rem;font:inh
 button{min-height:3rem;padding:.7rem 1rem;border:0;border-radius:6px;background:#235f47;color:#fff;font:inherit;font-weight:700}
 .secondary{background:#e8eee4;color:#17352f}
 button:disabled{background:#d5ddd4;color:#17352f}
+.expert-shell{width:min(100% - 2rem,38rem);margin:2rem auto 4rem}.expert-shell form{width:100%;margin:1.5rem 0}.expert-shell h1{font-size:clamp(1.8rem,6vw,2.6rem);line-height:1.2}.answer-context{white-space:pre-wrap;overflow-wrap:anywhere}input[type=radio]{accent-color:#235f47}a{color:#235f47}button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid #d58936;outline-offset:3px}

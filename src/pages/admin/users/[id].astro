@@ -1,0 +1,24 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import UserFields from '../../../components/UserFields.astro';
+import { configured } from '../../../server/db.js';
+import { isAdmin } from '../../../server/auth.js';
+import { userDetail, validId } from '../../../server/management.js';
+if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
+let data = null; let failed = false;
+if (validId(Astro.params.id)) { try { data = await userDetail(Astro.params.id); } catch { failed = true; } }
+if (!data) Astro.response.status = failed ? 503 : 404;
+---
+<AdminLayout title="User details"><a href="/admin/users">← All users</a>
+  {!data ? <><h1>{failed ? 'User unavailable' : 'User not found'}</h1><p>Return to the user list and try again.</p></> : <>
+    <h1>{data.user.pseudonym}</h1><p class="badge">{data.user.active ? 'Active' : 'Inactive'} · {data.user.profile_mode}</p>
+    <form class="card" method="post" action="/api/admin/manage/user-edit"><h2>Edit profile</h2><input type="hidden" name="user" value={data.user.id} /><UserFields user={data.user} /><div class="actions"><button>Save profile</button></div></form>
+    <section class="card"><h2>Access</h2><p>{data.user.active ? 'Deactivation immediately blocks this user and revokes every invitation and session. Answers are preserved.' : 'Reactivation restores eligibility. Generate a new link afterward; revoked links and sessions remain invalid.'}</p><form method="post" action="/api/admin/manage/user-status"><input type="hidden" name="user" value={data.user.id} /><button class="secondary" name="active" value={data.user.active ? 'false' : 'true'}>{data.user.active ? 'Deactivate user' : 'Reactivate user'}</button></form></section>
+    <h2>Assignments & return links</h2><p class="muted">Links are copied manually. Generating a link reuses the assignment and preserves its progress.</p>
+    {!data.assignments.length && <p class="notice">No questionnaires assigned yet.</p>}
+    {data.assignments.map((assignment) => <article class="card"><h3>{assignment.title}</h3><p class="muted">{assignment.crisis_title}</p><p><strong>{assignment.submitted_at ? 'Submitted' : assignment.updated_at ? 'In progress' : 'Not started'}</strong> · {assignment.pending_invitation ? 'Invitation pending' : 'No unused invitation'}</p><form method="post" action="/api/admin/manage/invite"><input type="hidden" name="assignment" value={assignment.id} /><button disabled={!data.user.active}>Generate magic link</button></form></article>)}
+    {data.user.active && <form class="card" method="post" action="/api/admin/manage/assign"><h2>Assign a questionnaire</h2><input type="hidden" name="user" value={data.user.id} />
+      {data.available.length ? <><label for="questionnaire">Available questionnaires</label><select id="questionnaire" name="questionnaire" required>{data.available.map((q) => <option value={q.id}>{q.crisis_title} · {q.title}</option>)}</select><div class="actions"><button>Assign questionnaire</button></div></> : <p>No unassigned questionnaires in active crises. <a href="/admin/crises">Create one in a crisis.</a></p>}
+    </form>}
+  </>}
+</AdminLayout>

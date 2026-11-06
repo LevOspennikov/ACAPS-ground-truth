@@ -1,84 +1,42 @@
 ---
-import Layout from "../../layouts/Layout.astro";
-import AdminAccess from "../../components/AdminAccess.astro";
-import { configured, db, databaseVersion } from "../../server/db.js";
-import { isAdmin } from "../../server/auth.js";
-import { listRegions } from "../../server/regions.js";
-
-const query = (Astro.url.searchParams.get("q") || "").trim();
+import Layout from '../../layouts/Layout.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { configured, db, databaseVersion } from '../../server/db.js';
+import { listRegions } from '../../server/regions.js';
+import { isAdmin } from '../../server/auth.js';
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
+let stats = null;
 let regions = [];
-let questionnaires = [];
+const search = (Astro.url.searchParams.get('q') || '').trim().slice(0,80);
 let version = null;
-let databaseError = false;
+let failed = false;
 if (authenticated) {
   try {
     version = await databaseVersion();
-    regions = await listRegions(query);
-    questionnaires = await db()`SELECT q.id, q.title, count(a.id)::int AS invited,
-    count(r.submitted_at)::int AS submitted, count(r.assignment_id)::int AS started,
-    round(avg(r.likelihood) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS likelihood,
-    round(avg(r.confidence) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS confidence
-    FROM questionnaires q LEFT JOIN assignments a ON a.questionnaire_id = q.id
-    LEFT JOIN responses r ON r.assignment_id = a.id
-    WHERE q.region_slug IS NULL
-    GROUP BY q.id ORDER BY q.created_at DESC`;
-  } catch {
-    databaseError = true;
-  }
+    regions = await listRegions(search);
+    [stats] = await db()`SELECT (SELECT count(*)::int FROM experts) AS users,
+      (SELECT count(*)::int FROM crises WHERE archived = false) AS crises,
+      (SELECT count(*)::int FROM questionnaires) AS questionnaires,
+      (SELECT count(*)::int FROM responses WHERE submitted_at IS NOT NULL) AS submitted`;
+  } catch { failed = true; }
 }
-const invitation = Astro.cookies.get("new-invitation")?.value;
-if (invitation) Astro.cookies.delete("new-invitation", { path: "/admin" });
 ---
-
-<Layout title="Admin">
-  <AdminAccess ready={ready} authenticated={authenticated}>
-    <p><a href="/admin/risk-radar">Risk radar records →</a></p>
-    <h1 class="region-title"><a href="/admin">All Crisis</a></h1>
-    <form class="search" method="get" action="/admin">
-      <label for="q">Search regions</label>
-      <input id="q" name="q" value={query} maxlength="80" />
-      <button>Search</button>
-    </form>
-    {databaseError ? (
-      <div class="notice error" role="alert">
-        <p>Region data could not be loaded. Initialize the tables if this database was created before regions were added. Existing answers will be preserved.</p>
-        <form method="post" action="/api/admin/setup"><button>Initialize database tables</button></form>
-      </div>
-    ) : (
-      <>
-        {!regions.length && <p class="notice">{query ? "No region matches that search." : "No regions yet."}</p>}
-        <div class="region-grid">
-          {regions.map((region) => <a class="region-link" href={`/admin/regions/${region.slug}`}>{region.name}</a>)}
-        </div>
-        {Astro.url.searchParams.get("error") === "region" && <p class="notice error" role="alert">That region already exists.</p>}
-        <form class="card" method="post" action="/api/admin/region">
-          <h2>Add a region</h2>
-          <label for="name">Name</label>
-          <input id="name" name="name" required maxlength="80" />
-          <div class="actions"><button>Add region</button></div>
-        </form>
-      </>
-    )}
-    <form method="post" action="/api/admin/logout"><button class="secondary">Sign out</button></form>
-    <section class="card" aria-label="Database status">
-      <h2>Neon connection</h2>
-      {version ? <><p>Connected successfully.</p><p class="muted">{version}</p></> : <p class="notice error" role="alert">Could not connect to Neon. Check DATABASE_URL in your deployment environment.</p>}
-    </section>
-    {invitation && <div class="notice"><strong>Expert invitation ready</strong><p>Copy this link now. It expires in 48 hours and works once. Opening it creates a 7-day session on that browser.</p><a class="linkbox" href={`/invite?token=${invitation}`}>{Astro.url.origin}/invite?token={invitation}</a></div>}
-    {!databaseError && <section><h2>Questionnaires</h2><p class="muted">These are questionnaires that are not tied to a region. Region questionnaires are edited from the region page.</p>
-      {!questionnaires.length && <div class="card">No questionnaires yet. Create your first one below.</div>}
-      {questionnaires.map((q) => <article class="card"><h2>{q.title}</h2><p>{q.submitted} submitted · {q.started - q.submitted} in progress · {q.invited} assigned</p>
-        <p>Average likelihood: <strong>{q.likelihood ?? "—"}/5</strong> · confidence: <strong>{q.confidence ?? "—"}/5</strong></p>
-        <p><a href={`/admin/results/${q.id}`}>View answers and results →</a></p>
-        <form method="post" action="/api/admin/invite"><input type="hidden" name="questionnaire" value={q.id} /><button class="secondary">Create another expert invitation</button></form>
-      </article>)}
-    </section>}
-    {!databaseError && <form class="card" method="post" action="/api/admin/create"><h2>Create a questionnaire</h2><p>Each questionnaire asks about likelihood, confidence, and optional context.</p>
-      <label for="title">Risk title</label><input id="title" name="title" required maxlength="180" />
-      <label for="context">Risk description</label><textarea id="context" name="context" required maxlength="4000"></textarea>
-      <div class="actions"><button>Create & generate expert link</button></div>
-    </form>}
-  </AdminAccess>
-</Layout>
+{!authenticated ? <Layout title="Admin sign in"><p class="eyebrow">ORGANISER WORKSPACE</p><h1>Admin sign in</h1>
+  {!ready ? <p class="notice">Configure the Neon database connection, ADMIN_PASSWORD and SESSION_SECRET in Vercel first.</p> : <form class="card" method="post" action="/api/admin/login">
+    {Astro.url.searchParams.has('error') && <p class="notice error" role="alert">Sign in failed. Check your password and try again.</p>}
+    <label for="password">Admin password</label><input id="password" name="password" type="password" required autocomplete="current-password" maxlength="256" /><div class="actions"><button>Sign in</button></div>
+  </form>}
+</Layout> : <AdminLayout title="Admin overview"><p class="eyebrow">ORGANISER WORKSPACE</p><h1>Ground Truth overview</h1>
+  <p class="intro">Manage experts, organize crises, and invite people back to their assigned work.</p>
+  {stats && <div class="grid"><section class="card"><h2>Users</h2><p class="stat">{stats.users}</p><a href="/admin/users">Manage users →</a></section><section class="card"><h2>Active crises</h2><p class="stat">{stats.crises}</p><a href="/admin/crises">Manage crises →</a></section><section class="card"><h2>Questionnaires</h2><p class="stat">{stats.questionnaires}</p><p>{stats.submitted} submitted responses</p></section></div>}
+  <section><h2>Regions</h2><p>Existing region contacts, reports and questionnaire editor.</p><form class="search" method="get"><label for="region-search">Search regions</label><input id="region-search" name="q" value={search} maxlength="80" /><button>Search</button></form>
+    {!failed && !regions.length && <p class="notice">No regions found.</p>}
+    <div class="region-grid">{regions.map((region) => <a class="region-link" href={`/admin/regions/${region.slug}`}>{region.name}</a>)}</div>
+    {Astro.url.searchParams.get('error') === 'region' && <p class="notice error">That region already exists.</p>}
+    <form class="card" method="post" action="/api/admin/region"><h3>Add a region</h3><label for="region-name">Name</label><input id="region-name" name="name" required maxlength="80" /><div class="actions"><button>Add region</button></div></form>
+  </section>
+  <section class="card"><h2>Neon connection</h2>{version ? <><p>Connected successfully.</p><p class="muted">{version}</p></> : <p class="notice error">Could not connect to Neon. Check the deployment environment.</p>}
+    {failed && version && <><p class="notice error">The application schema is not ready. Initialization creates missing tables; schema changes to existing tables require the next prototype reset deployment.</p><form method="post" action="/api/admin/setup"><button>Initialize missing tables</button></form></>}
+  </section>
+</AdminLayout>}

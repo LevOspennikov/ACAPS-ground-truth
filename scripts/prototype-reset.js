@@ -17,7 +17,7 @@ export async function resetPrototypeDatabase(env) {
   // One transaction: a failed schema update rolls back the drops as well.
   // No CASCADE: unrelated tables and Neon-managed schemas must remain intact.
   await sql.transaction([
-    sql.query('DROP TABLE IF EXISTS responses, expert_sessions, invitations, assignments, experts, questionnaires, questionnaire_answers, questions, reports, regions, risk_radar'),
+    sql.query('DROP TABLE IF EXISTS responses, expert_sessions, invitations, assignments, experts, questionnaires, questionnaire_answers, questions, reports, regions, risk_radar, crises, categories'),
     ...statements.map((statement) => sql.query(statement)),
   ]);
 }
