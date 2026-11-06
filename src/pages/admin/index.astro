@@ -34,6 +34,7 @@ if (invitation) Astro.cookies.delete("new-invitation", { path: "/admin" });
 
 <Layout title="Admin">
   <AdminAccess ready={ready} authenticated={authenticated}>
+    <p><a href="/admin/risk-radar">Risk radar records →</a></p>
     <h1 class="region-title"><a href="/admin">All Crisis</a></h1>
     <form class="search" method="get" action="/admin">
       <label for="q">Search regions</label>

@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "astro dev",
-    "build": "astro build && node scripts/reset-db-on-deploy.js",
+    "build": "astro build && node scripts/reset-db-on-deploy.js && node scripts/seed-risk-radar.js",
     "db:setup": "node --env-file=.env scripts/setup-db.js",
     "test": "node --test"
   },
