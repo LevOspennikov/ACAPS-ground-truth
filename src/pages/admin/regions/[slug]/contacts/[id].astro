@@ -31,7 +31,17 @@ if (authenticated && !loadError && !contact) return new Response("Contact not fo
           <article class="card">
             <h3>{item.topic}</h3>
             <p class="muted">{item.date}</p>
-            <p>{item.submitted ? "Response submitted." : "Not yet submitted."}</p>
+            {item.lines.length ? (
+              <dl class="risk-fields">
+                {item.lines.map((line) => (
+                  <div>
+                    <dt>{line.prompt}</dt>
+                    <dd class="answer-context">{line.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : <p>No answers received.</p>}
+            {item.risk_id && <p><a href={`/admin/regions/${contact.region.slug}/answers?risk=${encodeURIComponent(item.risk_id)}`}>All answers for this risk</a></p>}
           </article>
         ))}
       </>
