@@ -1,7 +1,8 @@
 import { defineMiddleware } from 'astro:middleware';
 export const onRequest = defineMiddleware(async (_context, next) => {
   const response = await next();
-  response.headers.set('Cache-Control', 'no-store');
+  const type = response.headers.get('content-type') ?? '';
+  if (type.includes('text/html')) response.headers.set('Cache-Control', 'no-store');
   // Hide paths and invitation tokens while preserving Origin on native form
   // submissions. no-referrer makes browsers send Origin: null on these POSTs.
   response.headers.set('Referrer-Policy', 'strict-origin');

@@ -1,0 +1,13 @@
+body{margin:0;font:16px/1.4 system-ui,sans-serif;color:#17352f;background:#f3f5ef}
+form{width:min(100% - 1.5rem,32rem);margin:1rem auto}
+fieldset{margin:0 0 1rem;padding:0;border:0}
+legend,label{font-weight:700}
+.choice{display:block;margin:.4rem 0;padding:.7rem;background:#fff;border:1px solid #93a593;border-radius:6px;font-weight:500}
+textarea{width:100%;box-sizing:border-box;min-height:7rem;padding:.7rem;font:inherit;color:#17352f;border:1px solid #93a593;border-radius:6px}
+.muted{color:#3d5146}
+.notice{margin:0 0 1rem;padding:.8rem;background:#e4eddb}
+.error{background:#fff0e9;color:#6d2a12}
+.actions{display:flex;gap:.6rem;flex-wrap:wrap}
+button{min-height:3rem;padding:.7rem 1rem;border:0;border-radius:6px;background:#235f47;color:#fff;font:inherit;font-weight:700}
+.secondary{background:#e8eee4;color:#17352f}
+button:disabled{background:#d5ddd4;color:#17352f}

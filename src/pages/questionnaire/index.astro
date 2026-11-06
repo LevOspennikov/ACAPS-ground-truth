@@ -1,21 +1,119 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import { configured } from '../../server/db.js';
-import { expertAssignment } from '../../server/auth.js';
-const assignment = configured() ? await expertAssignment(Astro.cookies) : null;
+import "../../styles/expert.css";
+import questions from "../../data/questions.js";
+
+const total = questions.length;
+const visibilities = ["anonymous", "public"];
+
+const posted = Astro.request.method === "POST" ? await Astro.request.formData() : null;
+
+const read = (name) => {
+  const value = posted?.get(name);
+  return typeof value === "string" ? value.trim() : "";
+};
+
+const savedAnswer = (question) => {
+  const value = read(question.id);
+  if (!value) return "";
+  if (question.type === "single" && !question.options.some((_, index) => value === `${question.id}-${index}`)) return "";
+  return value.slice(0, 4000);
+};
+
+const currentRaw = Number(read("current") || "0");
+const current = Number.isInteger(currentRaw) && currentRaw >= 0 && currentRaw <= total ? currentRaw : 0;
+const stepRaw = posted?.get("step");
+let step = stepRaw == null || stepRaw === "" ? current : Number(stepRaw);
+if (!Number.isInteger(step) || step < 0 || step > total) step = current;
+
+let error = "";
+if (posted && step > current) {
+  const question = questions[current];
+  if (!savedAnswer(question)) {
+    step = current;
+    error = question.type === "text" ? "Write an answer to continue." : "Choose an answer to continue.";
+  }
+}
+
+const visibility = visibilities.includes(read("visibility")) ? read("visibility") : "";
+const alreadySubmitted = Astro.cookies.get("submitted")?.value === "1";
+let saved = alreadySubmitted;
+if (alreadySubmitted) step = total;
+if (posted && read("done") === "1" && !alreadySubmitted) {
+  step = total;
+  if (!visibility) {
+    error = "Choose anonymous or public.";
+    saved = false;
+  } else {
+    saved = true;
+    Astro.cookies.set("submitted", "1", { path: "/", httpOnly: true, sameSite: "lax", maxAge: 60 * 60 * 24 });
+  }
+}
+
+const question = questions[step];
 ---
-<Layout title="Questionnaire">
-  <p class="eyebrow">YOUR EXPERT PERSPECTIVE</p>
-  {!assignment ? <><h1>Your invitation starts here.</h1><p>Open the private link provided by your organiser to access your assigned questionnaire. If your session has expired, ask for a new invitation.</p><a href="/">Return home</a></> : <>
-    <h1>{assignment.title}</h1><p class="intro">{assignment.description}</p>
-    <p class="muted">About 3 minutes · Synthetic pilot · Your identity is never shown publicly.</p>
-    {assignment.submitted_at ? <div class="notice" role="status"><h2>Thank you. Your response is submitted.</h2><p>No further edits are needed. Group summaries are not shared with experts in this prototype.</p></div> : <>
-    {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Progress saved on the server. You can return in this browser within 7 days of opening your invitation.</p>}
-    <form method="post" action="/api/expert/respond">
-      <fieldset><legend>1. How likely is this risk?</legend><p class="muted">Choose one rating, from very unlikely to very likely.</p>{['Very unlikely', 'Unlikely', 'Neither likely nor unlikely', 'Likely', 'Very likely'].map((label, i) => <label class="choice"><input type="radio" name="likelihood" value={i + 1} checked={assignment.likelihood === i + 1} />{i + 1} — {label}</label>)}</fieldset>
-      <fieldset><legend>2. How confident are you in your assessment?</legend>{['Very low', 'Low', 'Moderate', 'High', 'Very high'].map((label, i) => <label class="choice"><input type="radio" name="confidence" value={i + 1} checked={assignment.confidence === i + 1} />{i + 1} — {label}</label>)}</fieldset>
-      <fieldset><legend>3. What context would help? (optional)</legend><label for="context">Evidence, information gaps, or a different perspective</label><textarea id="context" name="context" maxlength="4000">{assignment.context || ''}</textarea><small>Avoid names, contact details, or information that could identify you or others.</small></fieldset>
-      <p>Both ratings are needed to submit. You can save an incomplete response.</p><div class="actions"><button name="intent" value="save" class="secondary">Save progress</button><button name="intent" value="submit">Submit response</button></div>
-    </form></>}
-  </>}
-</Layout>
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Questionnaire</title>
+  </head>
+  <body>
+  {
+      <form method="post" action="/questionnaire">
+        <input type="hidden" name="current" value={step} />
+        {questions.filter((item) => item.id !== question?.id).map((item) => (
+          <input type="hidden" name={item.id} value={savedAnswer(item)} />
+        ))}
+        {step < total ? (
+          <>
+            <p class="muted">Question {step + 1} of {total}</p>
+            {question.type === "single" ? (
+              <fieldset>
+                <legend>{question.prompt}</legend>
+                {question.options.map((option, optionIndex) => {
+                  const value = `${question.id}-${optionIndex}`;
+                  return (
+                    <label class="choice">
+                      <input type="radio" name={question.id} value={value} required checked={savedAnswer(question) === value} />
+                      {option}
+                    </label>
+                  );
+                })}
+              </fieldset>
+            ) : (
+              <label for={question.id}>{question.prompt}</label>
+              <textarea id={question.id} name={question.id} rows="4" required maxlength="4000" placeholder={question.placeholder}>{savedAnswer(question)}</textarea>
+            )}
+            {error && <p class="notice error" role="alert">{error}</p>}
+            <div class="actions">
+              <button name="step" value={step + 1}>{step === total - 1 ? "Finish" : "Next"}</button>
+              {step > 0 && (
+                <button class="secondary" name="step" value={step - 1} formnovalidate>Back</button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <h1>Thank you for participating</h1>
+            <fieldset>
+              <legend>Submit as</legend>
+              {visibilities.map((option) => (
+                <label class="choice">
+                  <input type="radio" name="visibility" value={option} required checked={visibility === option} disabled={saved} />
+                  {option.slice(0, 1).toUpperCase() + option.slice(1)}
+                </label>
+              ))}
+            </fieldset>
+            {error && <p class="notice error" role="alert">{error}</p>}
+            <div class="actions">
+              {saved ? <button type="button" disabled>Submit</button> : <button name="done" value="1">Submit</button>}
+              {!saved && <button class="secondary" name="step" value={total - 1} formnovalidate>Back</button>}
+            </div>
+          </>
+        )}
+      </form>
+  }
+  </body>
+</html>
