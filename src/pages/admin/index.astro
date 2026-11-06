@@ -24,9 +24,6 @@ if (authenticated) {
 <PageLayout title="Country risks">
   <AdminAccess ready={ready} authenticated={authenticated}>
     <div class="row"><div><p class="eyebrow">ACAPS GROUND TRUTH</p><h1>Country risks</h1></div></div>
-    <p>Each region is one country. Choose a country, select a risk, then open or create a questionnaire for that risk.</p>
-    {import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true' && <p class="notice error">Prototype mode: production deployments reset application data and restore the twelve imported risks. Manually added risks and questionnaires will be removed.</p>}
-    {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Risk saved in the database.</p>}
     {failed ? <p class="notice error" role="alert">Country risk data could not be loaded. Apply the updated database schema and seed, then retry.</p> : <>
       <form class="search" method="get"><label for="q">Search countries</label><input id="q" name="q" value={search} maxlength="80" /><button>Search</button><a href="/admin">Clear</a></form>
       <nav class="region-grid" aria-label="Countries">{regions.map((r) => <a class="region-link" aria-current={selected?.slug === r.slug ? 'page' : undefined} href={`/admin?country=${encodeURIComponent(r.slug)}`}>{r.name} · {r.risks} risks</a>)}</nav>
