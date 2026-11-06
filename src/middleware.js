@@ -3,7 +3,9 @@ export const onRequest = defineMiddleware(async (_context, next) => {
   const response = await next();
   const type = response.headers.get('content-type') ?? '';
   if (type.includes('text/html')) response.headers.set('Cache-Control', 'no-store');
-  response.headers.set('Referrer-Policy', 'no-referrer');
+  // Hide paths and invitation tokens while preserving Origin on native form
+  // submissions. no-referrer makes browsers send Origin: null on these POSTs.
+  response.headers.set('Referrer-Policy', 'strict-origin');
   response.headers.set('X-Content-Type-Options', 'nosniff');
   response.headers.set('X-Frame-Options', 'DENY');
   // Vite injects styles and development tools inline. Enforce the production

@@ -1,0 +1,51 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { configured } from '../../../server/db.js';
+import { isAdmin } from '../../../server/auth.js';
+import { questionnaireResults } from '../../../server/results.js';
+
+if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
+
+const id = Astro.params.id;
+const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id || '');
+let result = null;
+let failed = false;
+if (validId) {
+  try {
+    result = await questionnaireResults(id);
+  } catch {
+    failed = true;
+  }
+}
+if (failed) Astro.response.status = 503;
+else if (!result) Astro.response.status = 404;
+const labels = ['Very unlikely', 'Unlikely', 'Neither likely nor unlikely', 'Likely', 'Very likely'];
+---
+<Layout title="Questionnaire results">
+  <a href="/admin">← Back to admin</a>
+  <p class="eyebrow">QUESTIONNAIRE RESULTS · ADMIN ONLY</p>
+  {failed ? <><h1>Results are unavailable.</h1><p class="notice error" role="alert">Could not load answers from Neon. Check the database connection and schema, then reload this page.</p></> : !result ? <><h1>Questionnaire not found.</h1><p>Return to admin and choose an existing questionnaire.</p></> : <>
+    <h1>{result.questionnaire.title}</h1>
+    <p class="intro">{result.questionnaire.context}</p>
+    <p class="muted">Saved in Neon. Reload to see the latest responses. Draft contents are private to each expert.</p>
+    <div class="grid">
+      <section class="card"><h2>Completion</h2><p class="stat">{result.summary.submitted} / {result.summary.assigned}</p><p>submitted · {result.summary.drafts} in progress · {result.summary.assigned - result.summary.submitted - result.summary.drafts} not started</p></section>
+      <section class="card"><h2>Submitted averages</h2><p>Likelihood: <strong>{result.summary.likelihood ?? '—'} / 5</strong></p><p>Confidence: <strong>{result.summary.confidence ?? '—'} / 5</strong></p></section>
+    </div>
+    <section class="card"><h2>Likelihood distribution</h2>
+      <p class="muted">Submitted answers only. Ratings describe likelihood, not percentages.</p>
+      <dl>{labels.map((label, index) => <div class="row"><dt>{index + 1} — {label}</dt><dd>{result.distribution.find((bucket) => bucket.likelihood === index + 1)?.total ?? 0} responses</dd></div>)}</dl>
+    </section>
+    <section><h2>Submitted answers</h2>
+      <p class="muted">Expert names and identifiers are omitted. Treat free-text context as confidential; it may contain identifying details.</p>
+      {result.summary.submitted === 0 && <div class="notice">No submitted answers yet. Share an invitation from admin, then complete and submit the questionnaire.</div>}
+      {result.summary.submitted > 100 && <p class="notice">Showing the 100 most recent submissions. Counts and averages include all submissions.</p>}
+      {result.responses.map((response) => <article class="card">
+        <h3>Submitted response</h3>
+        <p>Likelihood: <strong>{response.likelihood} / 5</strong> · Confidence: <strong>{response.confidence} / 5</strong></p>
+        <h4>Evidence and context</h4>
+        {response.context ? <p class="answer-context">{response.context}</p> : <p class="muted">No additional context provided.</p>}
+      </article>)}
+    </section>
+  </>}
+</Layout>
