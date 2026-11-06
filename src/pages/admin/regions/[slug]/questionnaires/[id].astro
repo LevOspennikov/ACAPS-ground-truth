@@ -25,7 +25,7 @@ const questionnaire = page?.questionnaire;
       <p class="notice error" role="alert">This questionnaire could not be loaded.</p>
     ) : questionnaire && (
       <>
-        <p><a href={questionnaire.risk_id ? `/admin/regions/${region.slug}/questionnaires?risk=${encodeURIComponent(questionnaire.risk_id)}` : `/admin/regions/${region.slug}`}>Back to {questionnaire.risk_id ? `${questionnaire.risk_id} questionnaires` : region.name}</a></p>
+        <p><a href={questionnaire.risk_id ? `/admin/regions/${region.slug}?risk=${encodeURIComponent(questionnaire.risk_id)}` : `/admin/regions/${region.slug}`}>Back to {region.name}</a></p>
         {questionnaire.risk_id ? <p class="notice"><strong>{questionnaire.risk_id}</strong> · {questionnaire.risk_title}</p> : <p class="notice">This existing questionnaire has no risk yet. Link it from the country page.</p>}
         <h1>{questionnaire.topic}</h1>
         <p class="muted">Opened {questionnaire.opened} · {region.name}</p>

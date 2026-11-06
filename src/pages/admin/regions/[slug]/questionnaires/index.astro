@@ -16,8 +16,9 @@ if (authenticated) {
   catch { loadError = true; }
 }
 if (authenticated && !loadError && !region) return new Response("Country not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
-if (authenticated && region && !risk && region.risks[0]) {
-  return Astro.redirect(`/admin/regions/${region.slug}/questionnaires?risk=${encodeURIComponent(region.risks[0].risk_id)}`);
+if (authenticated && region) {
+  const target = risk || region.risks[0]?.risk_id || "";
+  return Astro.redirect(`/admin/regions/${region.slug}${target ? `?risk=${encodeURIComponent(target)}` : ""}`);
 }
 ---
 

@@ -29,7 +29,7 @@ if (authenticated) {
       <nav class="region-grid" aria-label="Countries">{regions.map((r) => <a class="region-link" aria-current={selected?.slug === r.slug ? 'page' : undefined} href={`/admin?country=${encodeURIComponent(r.slug)}`}>{r.name} · {r.risks} risks</a>)}</nav>
       {!regions.length && <p class="notice">No countries found.</p>}
       {country && !selected && <p class="notice error">Country not found. Choose a country above.</p>}
-      {selected && <><h2>{selected.name}</h2><p><a href={`/admin/regions/${selected.slug}`}>Contacts and reports for {selected.name} →</a></p><RiskQuestionnaires region={selected} /></>}
+      {selected && <><h2>{selected.name}</h2><p><a href={`/admin/regions/${selected.slug}`}>Open {selected.name} →</a></p><RiskQuestionnaires region={selected} links="overview" /></>}
     </>}
   </AdminAccess>
 </PageLayout>
