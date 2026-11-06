@@ -9,8 +9,8 @@ let version = null;
 let databaseError = false;
 if (authenticated) {
   try {
-  version = await databaseVersion();
-  questionnaires = await db()`SELECT q.id, q.title, count(a.id)::int AS invited,
+    version = await databaseVersion();
+    questionnaires = await db()`SELECT q.id, q.title, count(a.id)::int AS invited,
     count(r.submitted_at)::int AS submitted, count(r.assignment_id)::int AS started,
     round(avg(r.likelihood) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS likelihood,
     round(avg(r.confidence) FILTER (WHERE r.submitted_at IS NOT NULL), 1) AS confidence
@@ -35,13 +35,17 @@ if (invitation) Astro.cookies.delete('new-invitation', { path: '/admin' });
     <section class="card" aria-label="Database status">
       <h2>Neon connection</h2>
       {version ? <><p>Connected successfully.</p><p class="muted">{version}</p></> : <p class="notice error" role="alert">Could not connect to Neon. Check DATABASE_URL in your deployment environment.</p>}
-      {databaseError && version && <p class="notice error" role="alert">Connected to Neon, but questionnaire data could not be loaded. Apply db/schema.sql to the connected database and try again.</p>}
+      {databaseError && version && <>
+        <p class="notice error" role="alert">Connected to Neon, but questionnaire data could not be loaded. Initialize the tables below if this is a new database. Existing answers will be preserved.</p>
+        <form method="post" action="/api/admin/setup"><button>Initialize database tables</button></form>
+      </>}
     </section>
     {invitation && <div class="notice"><strong>Expert invitation ready</strong><p>Copy this link now. It expires in 48 hours and works once. Opening it creates a 7-day session on that browser.</p><a class="linkbox" href={`/invite?token=${invitation}`}>{Astro.url.origin}/invite?token={invitation}</a></div>}
-    <section><h2>Questionnaires</h2><p class="muted">Synthetic participants only. Results include submitted responses; free-text answers are withheld from this initial dashboard.</p>
+    <section><h2>Questionnaires</h2><p class="muted">Synthetic participants only. Results include submitted responses. Open a questionnaire’s results to review ratings and context without expert identities.</p>
       {!databaseError && !questionnaires.length && <div class="card">No questionnaires yet. Create your first one below.</div>}
       {questionnaires.map((q) => <article class="card"><h2>{q.title}</h2><p>{q.submitted} submitted · {q.started - q.submitted} in progress · {q.invited} assigned</p>
         <p>Average likelihood: <strong>{q.likelihood ?? '—'}/5</strong> · confidence: <strong>{q.confidence ?? '—'}/5</strong></p>
+        <p><a href={`/admin/results/${q.id}`}>View answers and results →</a></p>
         <form method="post" action="/api/admin/invite"><input type="hidden" name="questionnaire" value={q.id} /><button class="secondary">Create another expert invitation</button></form>
       </article>)}
     </section>
