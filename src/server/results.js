@@ -3,7 +3,7 @@ import { db } from './db.js';
 // Never join expert identity fields into answer results.
 export async function questionnaireResults(id) {
   const sql = db();
-  const [questionnaire] = await sql`SELECT q.*, c.title AS crisis_title FROM questionnaires q JOIN crises c ON c.id = q.crisis_id WHERE q.id = ${id}`;
+  const [questionnaire] = await sql`SELECT q.*, coalesce(c.title, g.name, 'Questionnaire') AS crisis_title FROM questionnaires q LEFT JOIN crises c ON c.id = q.crisis_id LEFT JOIN regions g ON g.slug = q.region_slug WHERE q.id = ${id}`;
   if (!questionnaire) return null;
   const [summary, distributions, responses] = await sql.transaction([
     sql`SELECT count(a.id)::int AS assigned, count(r.assignment_id) FILTER (WHERE r.submitted_at IS NULL)::int AS drafts,

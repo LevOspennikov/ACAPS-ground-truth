@@ -1,0 +1,37 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import { configured } from '../../../server/db.js';
+import { isAdmin } from '../../../server/auth.js';
+import { listRiskRadar } from '../../../server/risk-radar.js';
+import { riskRadarFields, riskRadarSummaryKeys } from '../../../data/risk-radar-fields.js';
+if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
+const search = (Astro.url.searchParams.get('q') || '').trim().slice(0, 100);
+const rawPage = Number(Astro.url.searchParams.get('page') || 1);
+const page = Number.isSafeInteger(rawPage) && rawPage > 0 && rawPage <= 100000 ? rawPage : 1;
+let records = []; let total = 0; let failed = false;
+try { ({ records, total } = await listRiskRadar(search, page)); } catch { failed = true; Astro.response.status = 503; }
+const fields = riskRadarSummaryKeys.map((key) => riskRadarFields.find((field) => field.key === key));
+const moreFields = riskRadarFields.filter((field) => !riskRadarSummaryKeys.includes(field.key));
+const pageUrl = (number) => `/admin/risk-radar?${new URLSearchParams({ q: search, page: String(number) })}`;
+---
+<Layout title="Risk radar">
+  <a href="/admin">← Back to admin</a><p class="eyebrow">ACAPS RISK RADAR</p><h1>Risk radar records</h1>
+  <p>First ten records from the supplied CSV, plus records added here. All 25 export fields are retained; open a record to inspect its full content.</p>
+  {import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true' && <p class="notice error"><strong>Prototype reset enabled.</strong> Production deployments replace this table with the initial ten CSV records. Manually added risks will be removed.</p>}
+  {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Risk saved in the database.</p>}
+  <form class="search" method="get"><label for="search">Search ID, title or country</label><input id="search" name="q" value={search} maxlength="100" /><button>Search</button><a href="/admin/risk-radar">Clear</a></form>
+  {failed ? <p class="notice error" role="alert">Could not load risk radar records. Apply db/risk-radar.sql and seed the database with npm run db:setup, or wait for the production deployment to initialize it.</p> : <>
+    <div class="row"><p>{total} records{search ? ' matching your search' : ''}</p><a class="button" href="#add-risk">Add a risk</a></div>
+    {!records.length && <p class="notice">No records on this page.</p>}
+    {records.map((risk) => <article class="card" id={`risk-${risk.risk_id}`}><div class="row"><span class="badge">{risk.risk_id}</span><span class="muted">{risk.source_row ? `CSV record ${risk.source_row}` : 'Added manually'}</span></div><h2>{risk.risk_title}</h2><p>{risk.country}{risk.iso && <> ({risk.iso})</>}{risk.risk_type && <> · {risk.risk_type}</>}</p><p class="muted">Status: {risk.status || 'Not specified'} · Probability: {risk.probability || 'Not specified'} · Risk level: {risk.risk_level || 'Not specified'}</p>
+      {risk.rationale && <p>{risk.rationale.length > 240 ? risk.rationale.slice(0, 240) + '…' : risk.rationale}</p>}
+      <details><summary>View all export fields</summary><dl class="risk-fields">{riskRadarFields.map((field) => <div><dt>{field.label}</dt><dd class="answer-context">{risk[field.key] || '—'}</dd></div>)}</dl></details>
+    </article>)}
+    <nav class="actions" aria-label="Risk radar pagination">{page > 1 && <a href={pageUrl(page - 1)}>← Previous</a>}{page * 20 < total && <a href={pageUrl(page + 1)}>Next →</a>}</nav>
+    <form class="card" id="add-risk" method="post" action="/api/admin/risk-radar"><h2>Add a risk</h2><p class="muted">Risk ID, title and country are required. The other export fields are optional. Content is displayed as plain text.</p>
+      {fields.map((field) => <><label for={field.key}>{field.label}{field.required ? ' *' : ''}</label>{field.max > 1000 ? <textarea id={field.key} name={field.key} maxlength={field.max} required={field.required} /> : <input id={field.key} name={field.key} maxlength={field.max} required={field.required} />}</>)}
+      <details><summary>Additional export fields (optional)</summary>{moreFields.map((field) => <><label for={field.key}>{field.label}</label>{field.max > 1000 ? <textarea id={field.key} name={field.key} maxlength={field.max} /> : <input id={field.key} name={field.key} maxlength={field.max} />}</>)}</details>
+      <div class="actions"><button>Save risk</button></div>
+    </form>
+  </>}
+</Layout>

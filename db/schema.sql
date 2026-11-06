@@ -15,16 +15,16 @@ CREATE TABLE IF NOT EXISTS crises (
 );
 CREATE TABLE IF NOT EXISTS questionnaires (
   id uuid PRIMARY KEY,
-  crisis_id uuid NOT NULL REFERENCES crises(id),
+  crisis_id uuid REFERENCES crises(id),
   title text NOT NULL,
   context text NOT NULL,
-  questions jsonb NOT NULL CHECK (jsonb_typeof(questions) = 'array'),
+  questions jsonb NOT NULL DEFAULT '[]' CHECK (jsonb_typeof(questions) = 'array'),
   created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS experts (
   id uuid PRIMARY KEY,
   pseudonym text NOT NULL,
-  profile_mode text NOT NULL CHECK (profile_mode IN ('named', 'anonymous')),
+  profile_mode text NOT NULL DEFAULT 'anonymous' CHECK (profile_mode IN ('named', 'anonymous')),
   name text,
   email text,
   active boolean NOT NULL DEFAULT true,
@@ -60,3 +60,35 @@ CREATE TABLE IF NOT EXISTS responses (
 CREATE INDEX IF NOT EXISTS assignments_expert_idx ON assignments(expert_id);
 CREATE INDEX IF NOT EXISTS invitations_assignment_idx ON invitations(assignment_id);
 CREATE INDEX IF NOT EXISTS expert_sessions_assignment_idx ON expert_sessions(assignment_id);
+
+CREATE TABLE IF NOT EXISTS regions (
+  slug text PRIMARY KEY,
+  name text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS reports (
+  id uuid PRIMARY KEY,
+  region_slug text NOT NULL REFERENCES regions(slug),
+  title text NOT NULL,
+  summary text NOT NULL,
+  published_on date NOT NULL DEFAULT CURRENT_DATE,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE experts ADD COLUMN IF NOT EXISTS region_slug text REFERENCES regions(slug);
+ALTER TABLE experts ADD COLUMN IF NOT EXISTS focus text NOT NULL DEFAULT '';
+ALTER TABLE questionnaires ADD COLUMN IF NOT EXISTS region_slug text REFERENCES regions(slug);
+ALTER TABLE questionnaires ADD COLUMN IF NOT EXISTS sent_at timestamptz;
+CREATE TABLE IF NOT EXISTS questions (
+  id uuid PRIMARY KEY,
+  questionnaire_id uuid NOT NULL REFERENCES questionnaires(id),
+  position integer NOT NULL,
+  type text NOT NULL CHECK (type IN ('single', 'text')),
+  prompt text NOT NULL,
+  options text NOT NULL DEFAULT '',
+  placeholder text NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS questionnaire_answers (
+  assignment_id uuid PRIMARY KEY REFERENCES assignments(id),
+  answer text NOT NULL,
+  submitted_at timestamptz NOT NULL DEFAULT now()
+);

@@ -2,15 +2,19 @@
 import Layout from '../../layouts/Layout.astro';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { configured, db, databaseVersion } from '../../server/db.js';
+import { listRegions } from '../../server/regions.js';
 import { isAdmin } from '../../server/auth.js';
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
 let stats = null;
+let regions = [];
+const search = (Astro.url.searchParams.get('q') || '').trim().slice(0,80);
 let version = null;
 let failed = false;
 if (authenticated) {
   try {
     version = await databaseVersion();
+    regions = await listRegions(search);
     [stats] = await db()`SELECT (SELECT count(*)::int FROM experts) AS users,
       (SELECT count(*)::int FROM crises WHERE archived = false) AS crises,
       (SELECT count(*)::int FROM questionnaires) AS questionnaires,
@@ -26,6 +30,12 @@ if (authenticated) {
 </Layout> : <AdminLayout title="Admin overview"><p class="eyebrow">ORGANISER WORKSPACE</p><h1>Ground Truth overview</h1>
   <p class="intro">Manage experts, organize crises, and invite people back to their assigned work.</p>
   {stats && <div class="grid"><section class="card"><h2>Users</h2><p class="stat">{stats.users}</p><a href="/admin/users">Manage users →</a></section><section class="card"><h2>Active crises</h2><p class="stat">{stats.crises}</p><a href="/admin/crises">Manage crises →</a></section><section class="card"><h2>Questionnaires</h2><p class="stat">{stats.questionnaires}</p><p>{stats.submitted} submitted responses</p></section></div>}
+  <section><h2>Regions</h2><p>Existing region contacts, reports and questionnaire editor.</p><form class="search" method="get"><label for="region-search">Search regions</label><input id="region-search" name="q" value={search} maxlength="80" /><button>Search</button></form>
+    {!failed && !regions.length && <p class="notice">No regions found.</p>}
+    <div class="region-grid">{regions.map((region) => <a class="region-link" href={`/admin/regions/${region.slug}`}>{region.name}</a>)}</div>
+    {Astro.url.searchParams.get('error') === 'region' && <p class="notice error">That region already exists.</p>}
+    <form class="card" method="post" action="/api/admin/region"><h3>Add a region</h3><label for="region-name">Name</label><input id="region-name" name="name" required maxlength="80" /><div class="actions"><button>Add region</button></div></form>
+  </section>
   <section class="card"><h2>Neon connection</h2>{version ? <><p>Connected successfully.</p><p class="muted">{version}</p></> : <p class="notice error">Could not connect to Neon. Check the deployment environment.</p>}
     {failed && version && <><p class="notice error">The application schema is not ready. Initialization creates missing tables; schema changes to existing tables require the next prototype reset deployment.</p><form method="post" action="/api/admin/setup"><button>Initialize missing tables</button></form></>}
   </section>

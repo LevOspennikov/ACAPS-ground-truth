@@ -16,12 +16,12 @@ export async function userDetail(id) {
   const sql = db();
   const [user] = await sql`SELECT * FROM experts WHERE id = ${id}`;
   if (!user) return null;
-  const assignments = await sql`SELECT a.id, q.title, c.title AS crisis_title, r.submitted_at, r.updated_at,
+  const assignments = await sql`SELECT a.id, q.title, coalesce(c.title, g.name, 'Questionnaire') AS crisis_title, r.submitted_at, r.updated_at,
     EXISTS(SELECT 1 FROM invitations i WHERE i.assignment_id = a.id AND i.used_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > now()) AS pending_invitation
-    FROM assignments a JOIN questionnaires q ON q.id = a.questionnaire_id JOIN crises c ON c.id = q.crisis_id
+    FROM assignments a JOIN questionnaires q ON q.id = a.questionnaire_id LEFT JOIN crises c ON c.id = q.crisis_id LEFT JOIN regions g ON g.slug = q.region_slug
     LEFT JOIN responses r ON r.assignment_id = a.id WHERE a.expert_id = ${id} ORDER BY a.created_at DESC`;
-  const available = await sql`SELECT q.id, q.title, c.title AS crisis_title FROM questionnaires q JOIN crises c ON c.id = q.crisis_id
-    WHERE c.archived = false AND NOT EXISTS(SELECT 1 FROM assignments a WHERE a.questionnaire_id = q.id AND a.expert_id = ${id}) ORDER BY q.created_at DESC`;
+  const available = await sql`SELECT q.id, q.title, coalesce(c.title, g.name, 'Questionnaire') AS crisis_title FROM questionnaires q LEFT JOIN crises c ON c.id = q.crisis_id LEFT JOIN regions g ON g.slug = q.region_slug
+    WHERE (c.archived = false OR (q.crisis_id IS NULL AND q.sent_at IS NOT NULL)) AND NOT EXISTS(SELECT 1 FROM assignments a WHERE a.questionnaire_id = q.id AND a.expert_id = ${id}) ORDER BY q.created_at DESC`;
   return { user, assignments, available };
 }
 export async function crises(category = '', status = 'active') {
@@ -48,8 +48,8 @@ export async function createQuestionnaire(crisisId, title, context) {
 }
 export async function assignQuestionnaire(expertId, questionnaireId) {
   const [assignment] = await db()`INSERT INTO assignments (id, questionnaire_id, expert_id)
-    SELECT ${randomUUID()}, q.id, e.id FROM questionnaires q JOIN crises c ON c.id = q.crisis_id CROSS JOIN experts e
-    WHERE q.id = ${questionnaireId} AND e.id = ${expertId} AND e.active = true AND c.archived = false
+    SELECT ${randomUUID()}, q.id, e.id FROM questionnaires q LEFT JOIN crises c ON c.id = q.crisis_id CROSS JOIN experts e
+    WHERE q.id = ${questionnaireId} AND e.id = ${expertId} AND e.active = true AND (c.archived = false OR (q.crisis_id IS NULL AND q.sent_at IS NOT NULL))
     ON CONFLICT (questionnaire_id, expert_id) DO UPDATE SET expert_id = EXCLUDED.expert_id RETURNING id`;
   if (!assignment) throw new Error('Choose an active user and a questionnaire in an active crisis.');
   return assignment.id;

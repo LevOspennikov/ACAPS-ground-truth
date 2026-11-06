@@ -1,0 +1,126 @@
+---
+import Layout from "../../../layouts/Layout.astro";
+import AdminAccess from "../../../components/AdminAccess.astro";
+import Participation from "../../../components/Participation.astro";
+import { configured } from "../../../server/db.js";
+import { isAdmin } from "../../../server/auth.js";
+import { regionBoard } from "../../../server/regions.js";
+
+const ready = configured();
+const authenticated = ready && isAdmin(Astro.cookies);
+let region = null;
+let loadError = false;
+if (authenticated) {
+  try { region = await regionBoard(Astro.params.slug); }
+  catch { loadError = true; }
+}
+if (authenticated && !loadError && !region) return new Response("Region not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+
+const view = Astro.url.searchParams.get("view");
+const showReports = view === "reports";
+const showQuestionnaires = view === "questionnaires";
+const current = region?.questionnaires.filter((item) => !item.sent) ?? [];
+const sent = region?.questionnaires.filter((item) => item.sent) ?? [];
+---
+
+<Layout title={region?.name || "Region"}>
+  <AdminAccess ready={ready} authenticated={authenticated}>
+    {loadError ? (
+      <div class="notice error" role="alert">
+        <p>This region could not be loaded. Initialize the tables if they are missing.</p>
+        <form method="post" action="/api/admin/setup"><button>Initialize database tables</button></form>
+      </div>
+    ) : region && <>
+    <p><a href="/admin">All regions</a></p>
+    <h1 class="region-title">{region.name}</h1>
+    <div class="region-board">
+      <section class="card" aria-labelledby="report-heading">
+        <h2 id="report-heading">Report</h2>
+        {showReports ? (
+          <>
+            <p class="muted">Reports for this region, newest first.</p>
+            {!region.reports.length && <p>No reports yet.</p>}
+            <ul>
+              {region.reports.map((report) => (
+                <li><a href={`/admin/regions/${region.slug}/reports/${report.id}`}>{report.title} · {report.date}</a></li>
+              ))}
+            </ul>
+            <p><a href={`/admin/regions/${region.slug}`}>Back to the latest report</a></p>
+          </>
+        ) : region.reports.length ? (
+          <>
+            <p><a href={`/admin/regions/${region.slug}/reports/${region.reports[0].id}`}><strong>{region.reports[0].title}</strong></a></p>
+            <p class="muted">{region.reports[0].date}</p>
+            <p>{region.reports[0].summary}</p>
+            <p><a class="button secondary" href={`/admin/regions/${region.slug}?view=reports`}>All old reports</a></p>
+          </>
+        ) : <p>No report yet.</p>}
+        <form method="post" action="/api/admin/report">
+          <h3>Add a report</h3>
+          <input type="hidden" name="region" value={region.slug} />
+          <label for="title">Title</label>
+          <input id="title" name="title" required maxlength="180" />
+          <label for="summary">Summary</label>
+          <textarea id="summary" name="summary" required maxlength="4000"></textarea>
+          <div class="actions"><button>Save report</button></div>
+        </form>
+      </section>
+      <section class="card" aria-labelledby="questions-heading">
+        <h2 id="questions-heading">Questionnaires</h2>
+        {showQuestionnaires ? (
+          <>
+            <p class="muted">Sent questionnaires for this region.</p>
+            {!sent.length && <p>No sent questionnaires.</p>}
+            <ul>
+              {sent.map((item) => (
+                <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent}</li>
+              ))}
+            </ul>
+            <p><a href={`/admin/regions/${region.slug}`}>Back to current questionnaires</a></p>
+          </>
+        ) : (
+          <>
+            <h3>Current</h3>
+            {!current.length && <p>No questionnaire in progress.</p>}
+            <ul>
+              {current.map((item) => (
+                <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · opened {item.opened}</li>
+              ))}
+            </ul>
+            <p><a href={`/admin/regions/${region.slug}?view=questionnaires`}>Questionnaire history</a></p>
+            <form method="post" action="/api/admin/region-questionnaire">
+              <h3>Build new questionnaire</h3>
+              <input type="hidden" name="region" value={region.slug} />
+              <label for="topic">Topic</label>
+              <input id="topic" name="topic" required maxlength="180" />
+              <div class="actions"><button>Create questionnaire</button></div>
+            </form>
+          </>
+        )}
+      </section>
+      <section class="card" aria-labelledby="contacts-heading">
+        <h2 id="contacts-heading">Contacts</h2>
+        <p>Experts for {region.name}. Sending a questionnaire assigns it to these people.</p>
+        {!region.contacts.length && <p>No contacts yet.</p>}
+        <ul class="contacts">
+          {region.contacts.map((contact) => (
+            <li class="contact-row">
+              <a href={`/admin/regions/${region.slug}/contacts/${contact.id}`}>{contact.name}</a>
+              <Participation joined={contact.joined} invited={contact.invited} />
+            </li>
+          ))}
+        </ul>
+        <form method="post" action="/api/admin/contact">
+          <h3>Add a contact</h3>
+          <input type="hidden" name="region" value={region.slug} />
+          <label for="contact-name">Name</label>
+          <input id="contact-name" name="name" required maxlength="120" />
+          <label for="focus">Focus</label>
+          <input id="focus" name="focus" maxlength="120" />
+          <div class="actions"><button>Add contact</button></div>
+        </form>
+      </section>
+    </div>
+    </>}
+  </AdminAccess>
+</Layout>

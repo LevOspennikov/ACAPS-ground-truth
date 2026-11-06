@@ -18,10 +18,10 @@ export async function expertAssignment(cookies) {
   if (!value) return null;
   const sql = db();
   const [assignment] = await sql`SELECT a.id, q.title, q.context AS description, q.questions,
-    e.profile_mode, c.title AS crisis_title, c.country, r.answers, r.progress_step, r.submitted_at, r.updated_at
+    e.profile_mode, coalesce(c.title, g.name, 'Questionnaire') AS crisis_title, coalesce(c.country, g.name, '') AS country, r.answers, r.progress_step, r.submitted_at, r.updated_at
     FROM expert_sessions s JOIN assignments a ON a.id = s.assignment_id
     JOIN experts e ON e.id = a.expert_id JOIN questionnaires q ON q.id = a.questionnaire_id
-    JOIN crises c ON c.id = q.crisis_id LEFT JOIN responses r ON r.assignment_id = a.id
+    LEFT JOIN crises c ON c.id = q.crisis_id LEFT JOIN regions g ON g.slug = q.region_slug LEFT JOIN responses r ON r.assignment_id = a.id
     WHERE s.token_hash = ${hash(value)} AND s.expires_at > now() AND e.active = true`;
   return assignment || null;
 }

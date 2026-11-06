@@ -10,7 +10,7 @@ Use Node.js 22.23.4+ (Node 24 LTS recommended).
 2. Copy `.env.example` to `.env`.
 3. Create a Neon project and paste its PostgreSQL connection string into `DATABASE_URL`. Use the connection string with SSL enabled.
 4. Generate two independent secrets with `openssl rand -hex 32`. Set `ADMIN_PASSWORD` to one and `SESSION_SECRET` to the other (minimum 32 characters).
-5. Run `npm run db:setup` to create the empty database tables. Alternatively, paste `db/schema.sql` into the Neon SQL Editor. Setup is idempotent and does not delete existing records.
+5. Run `npm run db:setup` to create the application tables and seed the first ten risk radar records. Alternatively, paste `db/schema.sql` into the Neon SQL Editor. Setup is idempotent and does not delete existing records.
 6. Run `npm run dev`, then open `http://localhost:4321`.
 
 The homepage works without environment variables as a deployment smoke check. Database-backed functionality requires all three variables and the schema.
@@ -27,7 +27,7 @@ No Vercel CLI, Resend account, or separate backend host is needed for manual set
 
 ## Reset on prototype deployments
 
-Set `RESET_DATABASE_ON_DEPLOY=true` in Vercel's **Production** environment to start each production deployment with empty application tables recreated from `db/schema.sql`. This deletes categories, crises, questionnaires, users, assignments, invitations, expert sessions, and answers. Admin credentials remain in Vercel environment variables. Integration-managed tables and the database itself are preserved.
+Set `RESET_DATABASE_ON_DEPLOY=true` in Vercel’s Production environment to reset all application records, including users, crises, categories, regions, questionnaires and answers. The Risk Radar catalog is reseeded with the first ten CSV records. Admin credentials and integration-managed tables are preserved.
 
 While this mode is enabled, edit `db/schema.sql` and push to `main` to deploy the new schema. Existing data is intentionally discarded. The reset runs after `astro build` succeeds, in one database transaction; if recreating the schema fails, the drops roll back and the build fails. A later Vercel deployment failure can still leave the existing live app using the reset database. Avoid overlapping deployments while prototyping.
 
@@ -37,7 +37,7 @@ Local and Preview builds never trigger this reset. To stop deleting data, set `R
 
 1. Visit `/admin` and sign in with `ADMIN_PASSWORD`. The overview links to **Users** and **Crises & categories**.
 2. In Crises, create a category, then a crisis with title, country and description. Categories can be renamed or archived and crises filtered by category/status.
-3. Open the crisis and create a questionnaire. Its questions are snapshotted from `src/data/questions.js`; there is no question editor yet. Changing the code template never changes an existing questionnaire.
+3. Open the crisis and create a questionnaire. Its questions are snapshotted from `src/data/questions.js`; these crisis questionnaires use the code template. Region questionnaires retain their existing question editor. Changing the code template never changes an existing questionnaire.
 4. In Users, create a named or anonymous synthetic profile. Every user has a pseudonym. Anonymous profiles must have empty name/email; the database enforces this. Converting a named profile requires clearing those fields and explicitly confirming removal.
 5. Open the user, assign the questionnaire, then generate a magic link. Copy it to another browser and accept it. Regenerating a link reuses the same assignment and invalidates older unused invitations without deleting answers or valid sessions.
 6. Answer a question, save, and reload. Next/Back/Save all persist progress in Neon. A fresh invitation on another browser resumes that assignment, including its saved step. No offline storage or delivery is claimed.
@@ -46,6 +46,14 @@ Local and Preview builds never trigger this reset. To stop deleting data, set `R
 9. Confirm that all users and links disappear on the next production deployment while prototype reset mode remains enabled.
 
 Run `npm test` for validation, privacy-mode and reset-policy tests, and `npm run build` to validate Vercel output. A live Neon database is required for the end-to-end flow. Local builds preserve the database; opted-in production builds reset it.
+
+## Risk radar catalog
+
+Open `/admin/risk-radar` after signing in to list, search and add risk records. All 25 CSV fields are stored as text in the separate `risk_radar` table defined in `db/risk-radar.sql`. Risk ID is unique; manual additions require an ID, title and country. Other fields are optional. Content is escaped and displayed as plain text. The page lists 20 records per page and supports search by ID, title or country.
+
+`db/seeds/risk-radar.json` contains exactly the first ten data records (not physical lines) from the supplied root-level `risk-radar-export.csv`, with all fields, blanks, quotes and multiline content preserved. Source order is recorded in `source_row`; manual entries have no source row. The original CSV is not modified or required at runtime.
+
+`npm run db:setup` creates both schema files and imports the ten records for local development. Production builds run `scripts/seed-risk-radar.js`, which creates the catalog table if needed and inserts seed rows without replacing existing IDs. This happens even when prototype resets are disabled. When resets are enabled, the table is dropped and recreated before importing the ten records, so manual additions disappear on every production deployment. Preview builds neither import nor reset the database; initialize a separate preview database explicitly.
 
 ## Structure
 
@@ -74,4 +82,4 @@ Admin access uses one environment password and a signed eight-hour cookie. Exper
 
 Before handling real experts, add proper organiser accounts and login rate limiting, email delivery, expert-controlled privacy preferences, panels, configurable question editing, pagination for large admin lists, and aggregate suppression rules. Forms require connectivity and explicitly report server saves; there is no offline queue.
 
-The repository did not contain `data/risk-radar-export.csv`, `CLAUDE.md`, or `docs/challenge-brief.md` at implementation time. The demo uses a clearly labelled synthetic scenario and synthetic participant identifiers; it does not claim to import ACAPS risk data. No existing challenge files were replaced.
+The supplied root-level `risk-radar-export.csv` now provides the ten-record risk catalog seed. Expert and questionnaire demonstrations still use synthetic personal details. `CLAUDE.md` and `docs/challenge-brief.md` were not present. No existing challenge data was modified.
