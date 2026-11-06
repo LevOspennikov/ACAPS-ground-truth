@@ -1,0 +1,91 @@
+---
+import Layout from "../../../../../layouts/Layout.astro";
+import AdminAccess from "../../../../../components/AdminAccess.astro";
+import { configured } from "../../../../../server/db.js";
+import { isAdmin } from "../../../../../server/auth.js";
+import { editorPage } from "../../../../../server/regions.js";
+
+const ready = configured();
+const authenticated = ready && isAdmin(Astro.cookies);
+let page = null;
+let loadError = false;
+if (authenticated) {
+  try { page = await editorPage(Astro.params.slug, Astro.params.id); }
+  catch { loadError = true; }
+}
+if (authenticated && !loadError && !page) return new Response("Questionnaire not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+const error = Astro.url.searchParams.get("error");
+const region = page?.region;
+const questionnaire = page?.questionnaire;
+---
+
+<Layout title={questionnaire?.topic || "Questionnaire"}>
+  <AdminAccess ready={ready} authenticated={authenticated}>
+    {loadError ? (
+      <p class="notice error" role="alert">This questionnaire could not be loaded.</p>
+    ) : questionnaire && (
+      <>
+        <p><a href={`/admin/regions/${region.slug}`}>Back to {region.name}</a></p>
+        <h1>{questionnaire.topic}</h1>
+        <p class="muted">Opened {questionnaire.opened} · {region.name}</p>
+        {questionnaire.sent && <p class="notice" role="status">Sent on {questionnaire.sent} to the experts for {region.name}.</p>}
+        {error === "options" && <p class="notice error" role="alert">Multiple choice needs at least two options, one per line.</p>}
+        {error === "question" && <p class="notice error" role="alert">Check the question and try again.</p>}
+        {error === "send" && <p class="notice error" role="alert">Add at least one question before sending.</p>}
+        {error === "contacts" && <p class="notice error" role="alert">Add an expert for this region before sending.</p>}
+        {error === "locked" && <p class="notice error" role="alert">This questionnaire has already been sent.</p>}
+
+        <h2>Questions</h2>
+        {!questionnaire.questions.length && <p>No questions yet.</p>}
+        {questionnaire.questions.map((question, index) => (
+          <article class="card">
+            <h3>{index + 1}. {question.prompt}</h3>
+            <p class="muted">{question.type === "single" ? "Multiple choice" : "Free text"}</p>
+            {question.type === "single" && <ul>{question.options.map((option) => <li>{option}</li>)}</ul>}
+            {question.type === "text" && <p>{question.placeholder || "Free text."}</p>}
+            {!questionnaire.sent && (
+              <form method="post" action="/api/admin/questionnaire-editor">
+                <input type="hidden" name="region" value={region.slug} />
+                <input type="hidden" name="questionnaire" value={questionnaire.id} />
+                <input type="hidden" name="question" value={question.id} />
+                <input type="hidden" name="action" value="remove" />
+                <button class="secondary" type="submit">Remove</button>
+              </form>
+            )}
+          </article>
+        ))}
+
+        {!questionnaire.sent && (
+          <form class="card" method="post" action="/api/admin/questionnaire-editor">
+            <h2>Add a question</h2>
+            <input type="hidden" name="region" value={region.slug} />
+            <input type="hidden" name="questionnaire" value={questionnaire.id} />
+            <input type="hidden" name="action" value="add" />
+            <label for="prompt">Question</label>
+            <input id="prompt" name="prompt" required maxlength="300" />
+            <label for="type">Type</label>
+            <select id="type" name="type" required>
+              <option value="single">Multiple choice</option>
+              <option value="text">Free text</option>
+            </select>
+            <label for="options">Multiple choice options, one per line</label>
+            <textarea id="options" name="options" maxlength="2000"></textarea>
+            <label for="placeholder">Free text hint</label>
+            <input id="placeholder" name="placeholder" maxlength="180" />
+            <div class="actions"><button type="submit">Add question</button></div>
+          </form>
+        )}
+
+        {!questionnaire.sent && (
+          <form method="post" action="/api/admin/questionnaire-editor">
+            <input type="hidden" name="region" value={region.slug} />
+            <input type="hidden" name="questionnaire" value={questionnaire.id} />
+            <input type="hidden" name="action" value="send" />
+            <div class="actions"><button type="submit">Send</button></div>
+            <p class="muted">Assigns this questionnaire to the {page.contacts} experts for {region.name}.</p>
+          </form>
+        )}
+      </>
+    )}
+  </AdminAccess>
+</Layout>
