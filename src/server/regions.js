@@ -1,5 +1,6 @@
 import { countrySlug, selectCountryRisk } from "../data/countries.js";
 import { randomUUID } from "node:crypto";
+import { describeAnswers } from "./answers.js";
 import { isAdmin } from "./auth.js";
 import { db, configured } from "./db.js";
 import { reject, sameOrigin } from "./forms.js";
@@ -115,9 +116,15 @@ export async function contactPage(slug, id) {
     WHERE e.id = ${id}::uuid AND e.region_slug = ${slug}
     GROUP BY e.id, g.slug, g.name`;
   if (!contact) return null;
-  const answers = await sql`SELECT q.title AS topic, COALESCE(q.sent_at, a.created_at) AS happened, ans.answer
+  const answers = await sql`SELECT q.title AS topic, q.risk_id, COALESCE(r.submitted_at, q.sent_at, a.created_at) AS happened,
+    COALESCE(
+      CASE WHEN jsonb_typeof(q.questions) = 'array' AND jsonb_array_length(q.questions) > 0 THEN q.questions ELSE NULL END,
+      (SELECT jsonb_agg(jsonb_build_object('id', qs.id, 'type', qs.type, 'prompt', qs.prompt, 'options', qs.options) ORDER BY qs.position) FROM questions qs WHERE qs.questionnaire_id = q.id)
+    ) AS questions,
+    r.answers, r.submitted_at, ans.answer AS legacy_answer
     FROM assignments a
     JOIN questionnaires q ON q.id = a.questionnaire_id
+    LEFT JOIN responses r ON r.assignment_id = a.id
     LEFT JOIN questionnaire_answers ans ON ans.assignment_id = a.id
     WHERE a.expert_id = ${id}::uuid AND q.region_slug = ${slug}
     ORDER BY happened DESC`;
@@ -128,7 +135,66 @@ export async function contactPage(slug, id) {
     invited: contact.invited,
     joined: contact.joined,
     region: { slug: contact.slug, name: contact.region_name },
-    answers: answers.map((item) => ({ topic: item.topic, date: formatDate(item.happened), answer: item.answer || "" })),
+    answers: answers.map((item) => ({
+      topic: item.topic,
+      risk_id: item.risk_id || "",
+      date: formatDate(item.happened),
+      submitted: Boolean(item.submitted_at),
+      lines: describeAnswers(item.questions, item.answers),
+      legacy: item.legacy_answer || "",
+    })),
+  };
+}
+
+export async function riskAnswers(slug, riskId) {
+  if (!riskId || riskId.length > 40) return null;
+  const sql = db();
+  const [risk] = await sql`SELECT r.risk_id, r.risk_title, g.slug, g.name AS region_name
+    FROM risk_radar r JOIN regions g ON g.slug = r.region_slug
+    WHERE r.region_slug = ${slug} AND r.risk_id = ${riskId}`;
+  if (!risk) return null;
+  const rows = await sql`SELECT q.id AS questionnaire_id, q.title AS topic, q.created_at,
+    e.pseudonym AS expert, r.answers, r.submitted_at,
+    COALESCE(
+      CASE WHEN jsonb_typeof(q.questions) = 'array' AND jsonb_array_length(q.questions) > 0 THEN q.questions ELSE NULL END,
+      (SELECT jsonb_agg(jsonb_build_object('id', qs.id, 'type', qs.type, 'prompt', qs.prompt, 'options', qs.options) ORDER BY qs.position) FROM questions qs WHERE qs.questionnaire_id = q.id)
+    ) AS questions
+    FROM questionnaires q
+    LEFT JOIN assignments a ON a.questionnaire_id = q.id
+    LEFT JOIN experts e ON e.id = a.expert_id
+    LEFT JOIN responses r ON r.assignment_id = a.id
+    WHERE q.region_slug = ${slug} AND q.risk_id = ${riskId}
+    ORDER BY q.created_at DESC, r.submitted_at DESC NULLS LAST, e.pseudonym`;
+  const questionnaires = [];
+  for (const row of rows) {
+    let questionnaire = questionnaires.find((item) => item.id === row.questionnaire_id);
+    if (!questionnaire) {
+      questionnaire = { id: row.questionnaire_id, topic: row.topic, invited: 0, replies: [] };
+      questionnaires.push(questionnaire);
+    }
+    if (!row.expert) continue;
+    questionnaire.invited += 1;
+    if (!row.submitted_at) continue;
+    questionnaire.replies.push({
+      expert: row.expert,
+      date: formatDate(row.submitted_at),
+      lines: describeAnswers(row.questions, row.answers),
+    });
+  }
+  return {
+    risk_id: risk.risk_id,
+    risk_title: risk.risk_title,
+    region: { slug: risk.slug, name: risk.region_name },
+    questionnaires: questionnaires.map((questionnaire) => {
+      const prompts = questionnaire.replies[0]?.lines.map((line) => line.prompt) || [];
+      return {
+        ...questionnaire,
+        questions: prompts.map((prompt, index) => ({
+          prompt,
+          replies: questionnaire.replies.map((reply) => ({ expert: reply.expert, date: reply.date, value: reply.lines[index]?.value || "No answer provided" })),
+        })),
+      };
+    }),
   };
 }
 

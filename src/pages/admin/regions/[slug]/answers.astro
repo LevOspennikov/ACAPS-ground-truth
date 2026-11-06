@@ -1,0 +1,52 @@
+---
+import Layout from "../../../../layouts/Layout.astro";
+import AdminAccess from "../../../../components/AdminAccess.astro";
+import { configured } from "../../../../server/db.js";
+import { isAdmin } from "../../../../server/auth.js";
+import { riskAnswers } from "../../../../server/regions.js";
+
+const ready = configured();
+const authenticated = ready && isAdmin(Astro.cookies);
+const riskId = (Astro.url.searchParams.get("risk") || "").slice(0, 40);
+let page = null;
+let loadError = false;
+if (authenticated) {
+  try { page = await riskAnswers(Astro.params.slug, riskId); }
+  catch { loadError = true; }
+}
+if (authenticated && !loadError && !page) return new Response("Risk not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+---
+
+<Layout title={page ? `${page.risk_id} answers` : "Answers"}>
+  <AdminAccess ready={ready} authenticated={authenticated}>
+    {loadError ? <p class="notice error" role="alert">Answers for this risk could not be loaded.</p> : page && (
+      <>
+        <p><a href={`/admin/regions/${page.region.slug}?risk=${encodeURIComponent(page.risk_id)}`}>Back to {page.region.name}</a></p>
+        <p class="eyebrow">{page.risk_id} · {page.region.name}</p>
+        <h1>{page.risk_title}</h1>
+        <h2>All answers</h2>
+        {!page.questionnaires.length && <p>No questionnaires for this risk yet.</p>}
+        {page.questionnaires.map((questionnaire) => (
+          <article class="card">
+            <h3>{questionnaire.topic}</h3>
+            <p class="muted">{questionnaire.replies.length} submitted of {questionnaire.invited} invited</p>
+            {!questionnaire.questions.length && <p>No answers received.</p>}
+            {questionnaire.questions.map((question) => (
+              <section>
+                <h4>{question.prompt}</h4>
+                <ul class="contacts">
+                  {question.replies.map((reply) => (
+                    <li>
+                      <p><strong>{reply.expert}</strong> · {reply.date}</p>
+                      <p class="answer-context">{reply.value}</p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </article>
+        ))}
+      </>
+    )}
+  </AdminAccess>
+</Layout>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateQuestions, validateAnswer, firstUnanswered, answerLabel } from '../src/server/answers.js';
+import { validateQuestions, validateAnswer, firstUnanswered, answerLabel, describeAnswers } from '../src/server/answers.js';
 import { profileFields } from '../src/server/profiles.js';
 const questions = [{id:'risk',type:'single',prompt:'Risk?',options:['Low','High']},{id:'context',type:'text',prompt:'Context?'}];
 test('answers must match the assigned question snapshot', () => {
@@ -14,6 +14,12 @@ test('submission finds missing required answers and supports optional text', () 
   assert.equal(firstUnanswered(questions, {risk:'risk-0'}), 1);
   assert.equal(firstUnanswered(questions, {risk:'risk-0',context:'Evidence'}), 2);
   assert.equal(firstUnanswered([questions[0], {...questions[1],required:false}],{risk:'risk-0'}),2);
+});
+test('submitted answers are shown with the option the expert chose', () => {
+  const lines = describeAnswers(questions, { risk: 'risk-1', context: 'Roads closed' });
+  assert.deepEqual(lines, [{ prompt: 'Risk?', value: 'High' }, { prompt: 'Context?', value: 'Roads closed' }]);
+  assert.deepEqual(describeAnswers(JSON.stringify(questions), JSON.stringify({ risk: 'risk-0' }))[0], { prompt: 'Risk?', value: 'Low' });
+  assert.deepEqual(describeAnswers([], { note: 'Kept' }), [{ prompt: 'Answer', value: 'Kept' }]);
 });
 test('templates reject duplicate ids and unsupported types', () => {
   assert.equal(validateQuestions(questions),questions);

@@ -79,6 +79,7 @@ const riskHref = (riskId) => links === "overview"
           </div>
         ))}
       </dl>
+      <p><a class="button" href={`/admin/regions/${region.slug}/answers?risk=${encodeURIComponent(risk.risk_id)}`}>All answers for this risk</a></p>
       <h3>In progress</h3>
       {!current.length && <p>No draft questionnaires for this risk.</p>}
       <ul>
