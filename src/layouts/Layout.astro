@@ -4,7 +4,7 @@ const { title = 'Ground Truth' } = Astro.props;
 ---
 <!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>{title} · ACAPS</title></head>
+  <head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><meta name="robots" content="noindex" /><title>{title} · ACAPS</title><slot name="head" /></head>
   <body>
     <main><slot /></main>
     <footer>Synthetic data only · Humanitarian insight, informed by people.</footer>

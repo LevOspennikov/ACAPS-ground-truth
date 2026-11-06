@@ -26,7 +26,7 @@ const riskHref = (riskId) => links === "overview"
       <summary>Existing questionnaires without a risk ({region.unlinked.length})</summary>
       <p>Choose the appropriate risk in {region.name} to connect these questionnaires. Existing questions and answers are preserved.</p>
       {region.unlinked.map((item) => (
-        <form class="card" method="post" action="/api/admin/questionnaire-risk">
+        <form class="card" method="post" action="/api/admin/questionnaire-risk" data-astro-reload>
           <h3>{item.title}</h3>
           <input type="hidden" name="region" value={region.slug} />
           <input type="hidden" name="questionnaire" value={item.id} />
@@ -41,7 +41,7 @@ const riskHref = (riskId) => links === "overview"
   )}
   <details class="card" id="add-risk">
     <summary>Add another risk in {region.name}</summary>
-    <form method="post" action="/api/admin/region-risk">
+    <form method="post" action="/api/admin/region-risk" data-astro-reload>
       <input type="hidden" name="region" value={region.slug} />
       <p class="muted">Country is fixed to {region.name}. Risk ID and title are required; remaining fields are optional.</p>
       {summaryFields.map((field) => (
@@ -90,7 +90,7 @@ const riskHref = (riskId) => links === "overview"
       <ul>
         {sent.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent}</li>)}
       </ul>
-      <form method="post" action="/api/admin/region-questionnaire">
+      <form method="post" action="/api/admin/region-questionnaire" data-astro-reload>
         <h3>New questionnaire</h3>
         <input type="hidden" name="region" value={region.slug} />
         <input type="hidden" name="risk" value={risk.risk_id} />
