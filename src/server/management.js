@@ -4,8 +4,9 @@ import { hash, token } from './auth.js';
 import template from '../data/questions.js';
 import { coverageEligibility, expertCoverage } from './coverage.js';
 import { validateQuestions } from './answers.js';
+import { isUuid } from './ids.js';
 
-export const validId = (id) => typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+export const validId = isUuid;
 export async function categories() { return db()`SELECT * FROM categories ORDER BY archived, lower(name)`; }
 export async function users(search = '') {
   return db()`SELECT e.*, ARRAY(SELECT g.name FROM expert_countries ec JOIN regions g ON g.slug = ec.region_slug WHERE ec.expert_id = e.id ORDER BY g.name) AS countries, count(a.id)::int AS assigned, count(r.submitted_at)::int AS submitted

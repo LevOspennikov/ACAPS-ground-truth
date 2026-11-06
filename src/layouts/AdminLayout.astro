@@ -10,7 +10,6 @@ const reset = import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true';
     <a href="/admin" aria-current={Astro.url.pathname === '/admin' ? 'page' : undefined}>Overview</a>
     <a href="/admin/users" aria-current={Astro.url.pathname.startsWith('/admin/users') ? 'page' : undefined}>Users</a>
     <a href="/admin/crises" aria-current={Astro.url.pathname.startsWith('/admin/crises') ? 'page' : undefined}>Crises & categories</a>
-    <a href="/admin/risk-radar">Risk radar</a>
     <form method="post" action="/api/admin/logout"><button class="secondary">Sign out</button></form>
   </nav>
   {reset && <p class="notice error"><strong>Prototype: data resets on deployment.</strong> Every production deployment erases users, crises, assignments, invitations, sessions and answers. Return links work only until the next deployment.</p>}

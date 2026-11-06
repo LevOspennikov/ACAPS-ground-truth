@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './db.js';
 import { hash, token } from './auth.js';
+import { isUuid } from './ids.js';
 import { coverageEligibility } from './coverage.js';
 
 export async function inviteQuestionnaireRecipients(slug, questionnaireId, expertIds) {
   const ids = [...new Set(expertIds)];
-  if (!ids.length || ids.length > 50 || ids.some((id) => typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))) throw new Error('Choose between 1 and 50 recipients.');
+  if (!ids.length || ids.length > 50 || ids.some((id) => typeof id !== 'string' || !isUuid(id))) throw new Error('Choose between 1 and 50 recipients.');
   const sql = db();
   const invitations = ids.map((id) => ({ id, token: token() }));
   const queries = [
@@ -16,14 +17,9 @@ export async function inviteQuestionnaireRecipients(slug, questionnaireId, exper
       SELECT count(*) FROM experts e CROSS JOIN questionnaires q
       WHERE q.id = $1::uuid AND q.region_slug = $2 AND e.id = ANY($3::uuid[]) AND e.active = true
       AND (${coverageEligibility} OR EXISTS (SELECT 1 FROM assignments a WHERE a.expert_id = e.id AND a.questionnaire_id = q.id))
-      AND (q.sent_at IS NOT NULL OR EXISTS (SELECT 1 FROM questions question WHERE question.questionnaire_id = q.id))
+      AND (q.sent_at IS NOT NULL OR jsonb_array_length(q.questions) > 0)
     ) = $4 THEN 1 ELSE 0 END AS valid`, [questionnaireId, slug, ids, ids.length]),
-    sql`UPDATE questionnaires q SET sent_at = now(), questions = (
-      SELECT jsonb_agg(jsonb_build_object('id', question.id::text, 'type', question.type, 'prompt', question.prompt,
-        'options', CASE WHEN question.type = 'single' THEN to_jsonb(string_to_array(question.options, E'\n')) ELSE '[]'::jsonb END,
-        'placeholder', question.placeholder) ORDER BY question.position)
-      FROM questions question WHERE question.questionnaire_id = q.id
-    ) WHERE q.id = ${questionnaireId}::uuid AND q.region_slug = ${slug} AND q.sent_at IS NULL`,
+    sql`UPDATE questionnaires q SET sent_at = now() WHERE q.id = ${questionnaireId}::uuid AND q.region_slug = ${slug} AND q.sent_at IS NULL`,
     ...ids.map((id) => sql`INSERT INTO assignments (id, questionnaire_id, expert_id) VALUES (${randomUUID()}, ${questionnaireId}::uuid, ${id}::uuid) ON CONFLICT (questionnaire_id, expert_id) DO NOTHING`),
     ...ids.map((id) => sql`UPDATE invitations SET revoked_at = now() WHERE used_at IS NULL AND revoked_at IS NULL AND assignment_id IN (SELECT id FROM assignments WHERE questionnaire_id = ${questionnaireId}::uuid AND expert_id = ${id}::uuid)`),
     ...invitations.map((invitation) => sql`INSERT INTO invitations (token_hash, assignment_id, expires_at)

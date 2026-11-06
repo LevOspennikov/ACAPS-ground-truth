@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { db } from './db.js';
+import { db, configured } from './db.js';
+import { sameOrigin, reject } from './forms.js';
 export const hash = (value) => createHash('sha256').update(value).digest('hex');
 export const token = () => randomBytes(32).toString('hex');
 export const equal = (a, b) => timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b)));
@@ -12,6 +13,10 @@ export function setAdmin(cookies) {
 export function isAdmin(cookies) {
   const [expiry, signature] = (cookies.get('admin')?.value || '').split('.');
   return Boolean(expiry && signature && Number(expiry) > Date.now() && equal(signature, sign(expiry)));
+}
+export function denyUnlessAdmin(request, cookies) {
+  if (!sameOrigin(request) || !configured() || !isAdmin(cookies)) return reject('Forbidden', 403);
+  return null;
 }
 export async function expertAssignment(cookies) {
   const value = cookies.get('expert')?.value;

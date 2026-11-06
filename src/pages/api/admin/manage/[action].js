@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { configured, db } from '../../../../server/db.js';
-import { isAdmin, cookieOptions } from '../../../../server/auth.js';
-import { sameOrigin, textField, redirect, reject } from '../../../../server/forms.js';
+import { db } from '../../../../server/db.js';
+import { cookieOptions, denyUnlessAdmin } from '../../../../server/auth.js';
+import { textField, redirect, reject } from '../../../../server/forms.js';
 import { readCoverage, coverageQueries } from '../../../../server/coverage.js';
 import { profileFields } from '../../../../server/profiles.js';
 import { validId, createQuestionnaire, assignQuestionnaire, generateInvitation, setUserActive } from '../../../../server/management.js';
 
 export async function POST({ request, cookies, params }) {
-  if (!sameOrigin(request) || !configured() || !isAdmin(cookies)) return reject('Forbidden', 403);
+  const denied = denyUnlessAdmin(request, cookies);
+  if (denied) return denied;
   const form = await request.formData();
   const sql = db();
   const idField = (name) => {

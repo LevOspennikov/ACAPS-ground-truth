@@ -31,7 +31,7 @@ if (authenticated && !loadError && !contact) return new Response("Contact not fo
           <article class="card">
             <h3>{item.topic}</h3>
             <p class="muted">{item.date}</p>
-            <p>{item.answer || "No answers received."}</p>
+            <p>{item.submitted ? "Response submitted." : "Not yet submitted."}</p>
           </article>
         ))}
       </>

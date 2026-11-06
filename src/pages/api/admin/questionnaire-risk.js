@@ -1,5 +1,6 @@
 import { db } from '../../../server/db.js';
-import { denyUnlessAdmin, isUuid } from '../../../server/regions.js';
+import { denyUnlessAdmin } from '../../../server/auth.js';
+import { isUuid } from '../../../server/ids.js';
 import { redirect, reject, textField } from '../../../server/forms.js';
 export async function POST({ request, cookies }) {
   const denied = denyUnlessAdmin(request, cookies);
