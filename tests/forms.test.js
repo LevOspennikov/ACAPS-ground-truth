@@ -21,5 +21,6 @@ test('form mutations require an explicit matching origin', () => {
   const request = (origin) => new Request('https://example.org/api/action', { method: 'POST', headers: origin ? { origin } : {} });
   assert.equal(sameOrigin(request('https://example.org')), true);
   assert.equal(sameOrigin(request('https://evil.example')), false);
+  assert.equal(sameOrigin(request('null')), false);
   assert.equal(sameOrigin(request()), false);
 });
