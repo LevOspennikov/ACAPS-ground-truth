@@ -27,7 +27,7 @@ No Vercel CLI, Resend account, or separate backend host is needed for manual set
 
 ## Reset on prototype deployments
 
-Set `RESET_DATABASE_ON_DEPLOY=true` in Vercel's **Production** environment to start each production deployment with empty application tables recreated from `db/schema.sql`. This deletes questionnaires, synthetic experts, assignments, invitations, expert sessions, and answers. Admin credentials remain in Vercel environment variables. Integration-managed tables and the database itself are preserved.
+Set `RESET_DATABASE_ON_DEPLOY=true` in Vercel's **Production** environment to start each production deployment with empty application tables recreated from `db/schema.sql`. This deletes categories, crises, questionnaires, users, assignments, invitations, expert sessions, and answers. Admin credentials remain in Vercel environment variables. Integration-managed tables and the database itself are preserved.
 
 While this mode is enabled, edit `db/schema.sql` and push to `main` to deploy the new schema. Existing data is intentionally discarded. The reset runs after `astro build` succeeds, in one database transaction; if recreating the schema fails, the drops roll back and the build fails. A later Vercel deployment failure can still leave the existing live app using the reset database. Avoid overlapping deployments while prototyping.
 
@@ -35,15 +35,17 @@ Local and Preview builds never trigger this reset. To stop deleting data, set `R
 
 ## Test the prototype
 
-1. Visit `/admin` and sign in with `ADMIN_PASSWORD`.
-2. Create a questionnaire with the prefilled synthetic scenario. This also creates one synthetic expert assignment.
-3. Copy the generated invitation into a private browser window (or another browser). Accept it to establish an expert session. Do not share real personal information.
-4. Choose one rating, save progress, and reload: the answer comes from Neon.
-5. Complete both ratings and submit. Submitted responses cannot be changed. Reload `/admin` and choose **View answers and results** to see completion, average ratings, likelihood distribution, and submitted answers including optional context. Draft contents remain private. Only signed-in admins can access results; expert names and identifiers are omitted.
-6. Generate additional invitations to test multiple synthetic experts. Each button click creates a new participant, rather than resending an existing assignment.
-7. Verify that reusing an accepted invitation fails, while `/questionnaire` still works in the original expert browser for seven days.
+1. Visit `/admin` and sign in with `ADMIN_PASSWORD`. The overview links to **Users** and **Crises & categories**.
+2. In Crises, create a category, then a crisis with title, country and description. Categories can be renamed or archived and crises filtered by category/status.
+3. Open the crisis and create a questionnaire. Its questions are snapshotted from `src/data/questions.js`; there is no question editor yet. Changing the code template never changes an existing questionnaire.
+4. In Users, create a named or anonymous synthetic profile. Every user has a pseudonym. Anonymous profiles must have empty name/email; the database enforces this. Converting a named profile requires clearing those fields and explicitly confirming removal.
+5. Open the user, assign the questionnaire, then generate a magic link. Copy it to another browser and accept it. Regenerating a link reuses the same assignment and invalidates older unused invitations without deleting answers or valid sessions.
+6. Answer a question, save, and reload. Next/Back/Save all persist progress in Neon. A fresh invitation on another browser resumes that assignment, including its saved step. No offline storage or delivery is claimed.
+7. Finish the questions, review, and submit. Submission is final. Open results through the crisis to see single-choice counts and confidential submitted answers without user identities. Draft contents stay private.
+8. Deactivate a user to revoke all invitations/sessions and block access; reactivation requires a new link. Archive a crisis to stop new questionnaires/assignments while keeping existing expert access. Archiving a category removes it from new-crisis choices, without changing existing crises.
+9. Confirm that all users and links disappear on the next production deployment while prototype reset mode remains enabled.
 
-Run `npm test` for form-validation and origin checks, and `npm run build` to validate Vercel build output. A live Neon database is required for the end-to-end flow above; the build does not connect to the database.
+Run `npm test` for validation, privacy-mode and reset-policy tests, and `npm run build` to validate Vercel output. A live Neon database is required for the end-to-end flow. Local builds preserve the database; opted-in production builds reset it.
 
 ## Structure
 
@@ -64,12 +66,12 @@ src/middleware.js             Privacy and security headers
 
 ## Current scope and next iterations
 
-This is a synthetic-data deployment prototype. Three fixed prompts (likelihood, confidence, optional context) keep the first flow small. Questionnaire metadata is editable at creation only. Ratings use a 1–5 ordinal scale, not percentages. Admin results include unattributed submitted ratings and context (the latest 100 responses), with counts and averages over all submissions. Free text may contain identifying information and must be treated as confidential. There are no expert-facing group results.
+This is a synthetic-data deployment prototype with user, crisis and category management. Categories apply only to crises. User profiles support named (admin-only identity) and anonymous modes; deactivation preserves answers while blocking access. There are no user deletions. Questionnaire metadata is set at creation, and single-choice/text prompts stay defined in code. Each questionnaire stores an immutable prompt snapshot. Responses contain question-ID-keyed answers and server-side progress, not the old fixed rating columns. Results show single-choice counts over all submissions and the latest 100 unattributed responses. Free text may contain identifying information and must be treated as confidential. There are no expert-facing group results or public attribution options.
 
-The Neon Vercel integration may provide `STORAGE_DATABASE_URL`; the app and schema setup script accept this as a fallback to `DATABASE_URL`. Keep `ADMIN_PASSWORD` and `SESSION_SECRET` configured separately. If the database is new, sign in to admin and use **Initialize database tables**, or apply `db/schema.sql` through Neon's SQL Editor. Initialization uses only `CREATE TABLE IF NOT EXISTS` and preserves existing records. Production secrets marked Sensitive cannot be downloaded with `vercel env pull`; configure a separate local development database connection instead.
+The Neon Vercel integration may provide `STORAGE_DATABASE_URL`; the app and schema setup script accept this as a fallback to `DATABASE_URL`. Keep `ADMIN_PASSWORD` and `SESSION_SECRET` configured separately. If the database is new, sign in to admin and use **Initialize missing tables**, or apply `db/schema.sql` through Neon's SQL Editor. Initialization uses only `CREATE TABLE IF NOT EXISTS` and preserves existing records. Production secrets marked Sensitive cannot be downloaded with `vercel env pull`; configure a separate local development database connection instead.
 
 Admin access uses one environment password and a signed eight-hour cookie. Expert links contain opaque random tokens, expire after 48 hours, and are redeemed once in an atomic database statement; only token hashes are stored in Neon. Redemption requires an explicit POST so automated link previews do not consume invitations. Expert sessions are scoped to one assignment, expire after seven days, and use HTTP-only, secure cookies on deployed builds. Mutations enforce same-origin requests and server authorization. Submitted answers are locked against concurrent edits. Token-bearing URLs should be excluded from any future analytics or request logging; the app sends strict-origin and no-store headers. The referrer policy strips paths and query strings while preserving the Origin header required by native form submissions; do not replace it with no-referrer, which makes browser form POSTs send Origin: null.
 
-Before handling real experts, add proper organiser accounts and login rate limiting, session revocation/recovery, invitation resend for existing assignments, expert privacy preferences, panels, configurable question types, and aggregate suppression rules. Forms require connectivity and explicitly report server saves; there is no offline queue.
+Before handling real experts, add proper organiser accounts and login rate limiting, email delivery, expert-controlled privacy preferences, panels, configurable question editing, pagination for large admin lists, and aggregate suppression rules. Forms require connectivity and explicitly report server saves; there is no offline queue.
 
 The repository did not contain `data/risk-radar-export.csv`, `CLAUDE.md`, or `docs/challenge-brief.md` at implementation time. The demo uses a clearly labelled synthetic scenario and synthetic participant identifiers; it does not claim to import ACAPS risk data. No existing challenge files were replaced.

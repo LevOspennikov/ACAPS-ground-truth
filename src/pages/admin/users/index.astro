@@ -1,0 +1,19 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import UserFields from '../../../components/UserFields.astro';
+import { configured } from '../../../server/db.js';
+import { isAdmin } from '../../../server/auth.js';
+import { users } from '../../../server/management.js';
+if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
+const search = (Astro.url.searchParams.get('q') || '').slice(0, 150);
+let records = []; let failed = false;
+try { records = await users(search); } catch { failed = true; Astro.response.status = 503; }
+---
+<AdminLayout title="Users"><p class="eyebrow">EXPERT MANAGEMENT</p><h1>Users</h1><p>Keep named or anonymous profiles and invite each expert back to a specific questionnaire. Names and emails stay in admin.</p>
+  <form class="filter-form" method="get"><label for="search">Search pseudonym, name or email</label><input id="search" name="q" value={search} maxlength="150" /><button>Search</button><a href="/admin/users">Clear</a></form>
+  {failed ? <p class="notice error" role="alert">Could not load users. Check the database setup and retry.</p> : <>
+    {!records.length && <p class="notice">No users found.</p>}
+    {records.map((user) => <article class="card"><div class="row"><h2><a href={`/admin/users/${user.id}`}>{user.pseudonym}</a></h2><span class="badge">{user.active ? 'Active' : 'Inactive'} · {user.profile_mode}</span></div>{user.profile_mode === 'named' && <p>{user.name || 'No name'}{user.email && <> · {user.email}</>}</p>}<p>{user.submitted} submitted / {user.assigned} assigned</p><a href={`/admin/users/${user.id}`}>Edit, assign & generate links →</a></article>)}
+    <form class="card" method="post" action="/api/admin/manage/user-create"><h2>Create user</h2><UserFields /><div class="actions"><button>Create user</button></div></form>
+  </>}
+</AdminLayout>

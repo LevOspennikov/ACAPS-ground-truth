@@ -1,0 +1,23 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { configured } from '../../../server/db.js';
+import { isAdmin } from '../../../server/auth.js';
+import { categories, crises } from '../../../server/management.js';
+if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
+const category = (Astro.url.searchParams.get('category') || '').slice(0, 36);
+const status = ['active', 'archived', 'all'].includes(Astro.url.searchParams.get('status')) ? Astro.url.searchParams.get('status') : 'active';
+let groups = []; let records = []; let failed = false;
+try { [groups, records] = await Promise.all([categories(), crises(category, status)]); } catch { failed = true; Astro.response.status = 503; }
+---
+<AdminLayout title="Crises & categories"><p class="eyebrow">RISK CONTEXT</p><h1>Crises & categories</h1><p>Group crises by one primary category. Each crisis can contain several questionnaires.</p>
+  {failed ? <p class="notice error">Could not load crises. Check the database setup and retry.</p> : <>
+    <form class="filter-form" method="get"><label for="category-filter">Category</label><select id="category-filter" name="category"><option value="">All categories</option>{groups.map((k) => <option value={k.id} selected={category === k.id}>{k.name}{k.archived ? ' (archived)' : ''}</option>)}</select><label for="status">Status</label><select id="status" name="status">{['active','archived','all'].map((s) => <option value={s} selected={status === s}>{s}</option>)}</select><button>Filter crises</button></form>
+    {!records.length && <p class="notice">No crises found.</p>}
+    {records.map((crisis) => <article class="card"><div class="row"><h2><a href={`/admin/crises/${crisis.id}`}>{crisis.title}</a></h2><span class="badge">{crisis.archived ? 'Archived' : 'Active'}</span></div><p>{crisis.country} · {crisis.category_name} · {crisis.questionnaires} questionnaires</p><a href={`/admin/crises/${crisis.id}`}>Edit crisis & manage questionnaires →</a></article>)}
+    <section class="card"><h2>Create crisis</h2>{groups.some((k) => !k.archived) ? <form method="post" action="/api/admin/manage/crisis-create"><label for="title">Title</label><input id="title" name="title" required maxlength="180" /><label for="country">Country</label><input id="country" name="country" required maxlength="100" /><label for="category">Primary category</label><select id="category" name="category" required>{groups.filter((k) => !k.archived).map((k) => <option value={k.id}>{k.name}</option>)}</select><label for="description">Description</label><textarea id="description" name="description" maxlength="4000" /><div class="actions"><button>Create crisis</button></div></form> : <p>Create an active category below first.</p>}</section>
+    <section id="categories"><h2>Manage categories</h2><p class="muted">Archiving removes a category from new-crisis choices. Existing crises keep their category.</p>
+      <form class="card" method="post" action="/api/admin/manage/category-create"><label for="new-category">New category name</label><input id="new-category" name="name" required maxlength="100" /><div class="actions"><button>Create category</button></div></form>
+      {groups.map((k) => <form class="card" method="post" action="/api/admin/manage/category-edit"><input type="hidden" name="category" value={k.id} /><label for={`category-${k.id}`}>Category name</label><input id={`category-${k.id}`} name="name" value={k.name} required maxlength="100" /><label for={`status-${k.id}`}>Status</label><select id={`status-${k.id}`} name="archived"><option value="false" selected={!k.archived}>Active</option><option value="true" selected={k.archived}>Archived</option></select><div class="actions"><button class="secondary">Save category</button></div></form>)}
+    </section>
+  </>}
+</AdminLayout>

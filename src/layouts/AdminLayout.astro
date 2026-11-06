@@ -1,0 +1,19 @@
+---
+import Layout from './Layout.astro';
+const { title = 'Admin' } = Astro.props;
+const invitation = Astro.cookies.get('new-invitation')?.value;
+if (invitation) Astro.cookies.delete('new-invitation', { path: '/admin' });
+const reset = import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true';
+---
+<Layout title={title}>
+  <nav class="admin-nav" aria-label="Admin navigation">
+    <a href="/admin" aria-current={Astro.url.pathname === '/admin' ? 'page' : undefined}>Overview</a>
+    <a href="/admin/users" aria-current={Astro.url.pathname.startsWith('/admin/users') ? 'page' : undefined}>Users</a>
+    <a href="/admin/crises" aria-current={Astro.url.pathname.startsWith('/admin/crises') ? 'page' : undefined}>Crises & categories</a>
+    <form method="post" action="/api/admin/logout"><button class="secondary">Sign out</button></form>
+  </nav>
+  {reset && <p class="notice error"><strong>Prototype: data resets on deployment.</strong> Every production deployment erases users, crises, assignments, invitations, sessions and answers. Return links work only until the next deployment.</p>}
+  {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Changes saved on the server.</p>}
+  {invitation && <section class="notice" aria-label="Generated invitation"><h2>Magic link ready — copy it now</h2><p>This link belongs to the selected user and questionnaire. It works once, expires in 48 hours, and replaces earlier unused links for this assignment. Existing valid sessions and answers are preserved.</p><a class="linkbox" href={`/invite?token=${invitation}`}>{Astro.url.origin}/invite?token={invitation}</a></section>}
+  <slot />
+</Layout>

@@ -1,7 +1,7 @@
 import { shouldResetDatabase, resetPrototypeDatabase } from './prototype-reset.js';
 
 if (shouldResetDatabase(process.env)) {
-  console.log('Prototype reset enabled: recreating all six application tables.');
+  console.log('Prototype reset enabled: recreating all application tables.');
   await resetPrototypeDatabase(process.env);
   console.log('Prototype database reset complete.');
 } else {
