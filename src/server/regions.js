@@ -31,17 +31,18 @@ export async function createRegion(name) {
   return { slug };
 }
 
-export async function regionBoard(slug, riskId = "") {
+export async function regionBoard(slug, riskId = "", { includeContacts = false } = {}) {
   const sql = db();
   const [region] = await sql`SELECT slug, name FROM regions WHERE slug = ${slug}`;
   if (!region) return null;
-  const reports = await sql`SELECT id, title, summary, published_on FROM reports WHERE region_slug = ${slug} ORDER BY published_on DESC, created_at DESC`;
   const risks = await sql`SELECT * FROM risk_radar WHERE region_slug = ${slug} ORDER BY risk_id`;
   const selectedRisk = selectCountryRisk(risks, slug, riskId);
   const questionnaires = selectedRisk ? await sql`SELECT id, title, created_at, sent_at FROM questionnaires
     WHERE region_slug = ${slug} AND risk_id = ${selectedRisk.risk_id} ORDER BY created_at DESC` : [];
   const unlinked = await sql`SELECT id, title FROM questionnaires WHERE (region_slug = ${slug} OR region_slug IS NULL) AND risk_id IS NULL ORDER BY created_at DESC`;
-  const contacts = await sql`SELECT e.id, e.pseudonym AS name, e.focus,
+  // Only the country page renders contacts; overview and redirect callers skip
+  // this aggregate query entirely.
+  const contacts = includeContacts ? await sql`SELECT e.id, e.pseudonym AS name, e.focus,
     count(q.id)::int AS invited,
     count(a.id) FILTER (WHERE q.id IS NOT NULL AND r.submitted_at IS NOT NULL)::int AS joined
     FROM experts e JOIN expert_countries ec ON ec.expert_id = e.id
@@ -50,11 +51,10 @@ export async function regionBoard(slug, riskId = "") {
     LEFT JOIN responses r ON r.assignment_id = a.id
     WHERE ec.region_slug = ${slug}
     GROUP BY e.id
-    ORDER BY e.pseudonym`;
+    ORDER BY e.pseudonym` : [];
   return {
     ...region,
     risks, selectedRisk, unlinked,
-    reports: reports.map((report) => ({ ...report, date: formatDate(report.published_on) })),
     questionnaires: questionnaires.map((item) => ({ id: item.id, topic: item.title, opened: formatDate(item.created_at), sent: item.sent_at ? formatDate(item.sent_at) : "" })),
     contacts,
   };

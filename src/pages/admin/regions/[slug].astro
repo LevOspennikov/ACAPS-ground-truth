@@ -13,7 +13,7 @@ const authenticated = ready && isAdmin(Astro.cookies);
 let region = null;
 let loadError = false;
 if (authenticated) {
-  try { region = await regionBoard(Astro.params.slug, (Astro.url.searchParams.get("risk") || "").slice(0, 40)); }
+  try { region = await regionBoard(Astro.params.slug, (Astro.url.searchParams.get("risk") || "").slice(0, 40), { includeContacts: true }); }
   catch { loadError = true; }
 }
 if (authenticated && !loadError && !region) return new Response("Country not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
