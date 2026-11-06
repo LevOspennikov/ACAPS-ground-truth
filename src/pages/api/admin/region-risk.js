@@ -1,5 +1,5 @@
 import { db } from '../../../server/db.js';
-import { denyUnlessAdmin } from '../../../server/regions.js';
+import { denyUnlessAdmin } from '../../../server/auth.js';
 import { validateRiskRadar } from '../../../data/risk-radar-fields.js';
 import { addRiskRadar } from '../../../server/risk-radar.js';
 import { redirect, reject, textField } from '../../../server/forms.js';
