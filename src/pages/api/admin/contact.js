@@ -16,6 +16,6 @@ export async function POST({ request, cookies }) {
     return reject("A contact name of up to 120 characters is required.");
   }
   const id = await createContact(region, name, focus);
-  if (!id) return reject("Region not found", 404);
+  if (!id) return reject("Country not found", 404);
   return redirect(`/admin/regions/${region}/contacts/${id}`);
 }

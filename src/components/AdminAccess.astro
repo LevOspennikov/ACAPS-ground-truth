@@ -3,7 +3,7 @@ const { ready, authenticated } = Astro.props;
 ---
 
 {!ready ? (
-  <div class="notice">Set DATABASE_URL, ADMIN_PASSWORD and SESSION_SECRET, then apply db/schema.sql, before regions and questionnaires can be stored.</div>
+  <div class="notice">Set DATABASE_URL, ADMIN_PASSWORD and SESSION_SECRET, then apply db/schema.sql, before countries and questionnaires can be stored.</div>
 ) : !authenticated ? (
   <form class="card" method="post" action="/api/admin/login">
     <h2>Admin sign in</h2>
