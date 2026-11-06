@@ -9,8 +9,9 @@ if (process.env.VERCEL === '1' && process.env.VERCEL_ENV === 'production') {
   const sql = neon(connection);
   const schema = await readFile(new URL('../db/risk-radar.sql', import.meta.url), 'utf8');
   const baseSchema = await readFile(new URL('../db/schema.sql', import.meta.url), 'utf8');
+  const coverage = await readFile(new URL('../db/expert-coverage.sql', import.meta.url), 'utf8');
   const links = await readFile(new URL('../db/country-risk.sql', import.meta.url), 'utf8');
-  const statements = [...baseSchema.split(';'), schema, ...links.split(';')].map((s) => s.trim()).filter(Boolean);
+  const statements = [...baseSchema.split(';'), schema, ...links.split(';'), ...coverage.split(';')].map((s) => s.trim()).filter(Boolean);
   await sql.transaction(statements.map((s) => sql.query(s)));
   await seedCountryRisks(sql);
   console.log('Risk radar table ready; twelve CSV records and their country regions seeded without overwriting existing IDs.');
