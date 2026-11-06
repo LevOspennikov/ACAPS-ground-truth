@@ -33,7 +33,7 @@ const questionnaire = page?.questionnaire;
         {error === "options" && <p class="notice error" role="alert">Multiple choice needs at least two options, one per line.</p>}
         {error === "question" && <p class="notice error" role="alert">Check the question and try again.</p>}
         {error === "send" && <p class="notice error" role="alert">Add at least one question before sending.</p>}
-        {error === "contacts" && <p class="notice error" role="alert">Add an expert for this region before sending.</p>}
+        {error === "contacts" && <p class="notice error" role="alert">Add an expert for this country before sending.</p>}
         {error === "locked" && <p class="notice error" role="alert">This questionnaire has already been sent.</p>}
 
         <h2>Questions</h2>

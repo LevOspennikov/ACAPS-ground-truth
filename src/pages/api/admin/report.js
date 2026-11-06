@@ -16,6 +16,6 @@ export async function POST({ request, cookies }) {
     return reject("A title and summary are required.");
   }
   const id = await createReport(region, title, summary);
-  if (!id) return reject("Region not found", 404);
+  if (!id) return reject("Country not found", 404);
   return redirect(`/admin/regions/${region}/reports/${id}`);
 }

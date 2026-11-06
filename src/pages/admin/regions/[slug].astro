@@ -15,29 +15,29 @@ if (authenticated) {
   try { region = await regionBoard(Astro.params.slug, (Astro.url.searchParams.get("risk") || "").slice(0, 40)); }
   catch { loadError = true; }
 }
-if (authenticated && !loadError && !region) return new Response("Region not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+if (authenticated && !loadError && !region) return new Response("Country not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
 const view = Astro.url.searchParams.get("view");
 const showReports = view === "reports";
 
 ---
 
-<Layout title={region?.name || "Region"}>
+<Layout title={region?.name || "Country"}>
   <AdminAccess ready={ready} authenticated={authenticated}>
     {loadError ? (
       <div class="notice error" role="alert">
-        <p>This region could not be loaded. Initialize the tables if they are missing.</p>
+        <p>This country could not be loaded. Initialize the tables if they are missing.</p>
         <form method="post" action="/api/admin/setup"><button>Initialize database tables</button></form>
       </div>
     ) : region && <>
-    <p><a href="/admin">All regions</a></p>
+    <p><a href="/admin">All countries</a></p>
     <h1 class="region-title">{region.name}</h1>
     <div class="region-board">
       <section class="card" aria-labelledby="report-heading">
         <h2 id="report-heading">Report</h2>
         {showReports ? (
           <>
-            <p class="muted">Reports for this region, newest first.</p>
+            <p class="muted">Reports for this country, newest first.</p>
             {!region.reports.length && <p>No reports yet.</p>}
             <ul>
               {region.reports.map((report) => (
