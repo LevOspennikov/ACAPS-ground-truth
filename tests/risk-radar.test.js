@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import rows from '../db/seeds/risk-radar.json' with { type: 'json' };
-import { riskRadarSeedQueries } from '../db/seed-risk-radar.js';
+import { riskRadarSeedQueries, riskRadarSeedRows, seedCountryRisks } from '../db/seed-risk-radar.js';
+import { countrySlug, selectCountryRisk } from '../src/data/countries.js';
 import { riskRadarFields, validateRiskRadar } from '../src/data/risk-radar-fields.js';
 
 test('seed contains exactly the first ten CSV records and all 25 fields', () => {
@@ -15,11 +16,12 @@ test('seed contains exactly the first ten CSV records and all 25 fields', () => 
 });
 test('seed uses bound parameters and does not overwrite existing records', () => {
   const calls = riskRadarSeedQueries({ query: (query, values) => ({ query, values }) });
-  assert.equal(calls.length, 10);
+  assert.equal(calls.length, 12);
   for (const [i, call] of calls.entries()) {
+    const { record, sourceRow } = riskRadarSeedRows[i];
     assert.match(call.query, /ON CONFLICT DO NOTHING$/);
-    assert.ok(!call.query.includes(rows[i]['Risk Title']));
-    assert.deepEqual(call.values, [...riskRadarFields.map((field) => rows[i][field.label]), i + 1]);
+    assert.ok(!call.query.includes(record['Risk Title']));
+    assert.deepEqual(call.values, [...riskRadarFields.map((field) => record[field.label]), sourceRow, countrySlug(record.Country)]);
   }
 });
 test('schema stores all mapped export columns', async () => {
@@ -35,4 +37,37 @@ test('new records validate required fields, bounds and country codes', () => {
   form.set('iso','AF');assert.throws(() => validateRiskRadar(form));
   form.set('iso','');form.set('risk_id',"bad' id");assert.throws(() => validateRiskRadar(form));
   form.set('risk_id','DEMO-1');form.set('risk_title','x'.repeat(1001));assert.throws(() => validateRiskRadar(form));
+});
+
+test('additional records preserve two Chad rows from the source export', () => {
+  assert.deepEqual(riskRadarSeedRows.slice(10).map(({record,sourceRow}) => [record['Risk ID'],record.Country,sourceRow]), [['R0233','Chad',14],['R1043','Chad',15]]);
+  assert.deepEqual([...new Set(riskRadarSeedRows.map(({record}) => record.Country))], ['Afghanistan','Algeria','Bangladesh','Burundi','Chad']);
+});
+test('country initialization creates seeded and existing manual countries before inserting risks', async () => {
+  let statements;
+  const sql = {
+    query: (query, values) => query.startsWith('SELECT DISTINCT') ? [{country:'Manual country'}] : {query,values},
+    transaction: async (queries) => { statements=queries; },
+  };
+  await seedCountryRisks(sql);
+  const regions=statements.filter((s) => s.query.startsWith('INSERT INTO regions'));
+  assert.equal(regions.length,6);
+  assert.ok(regions.some((s) => s.values[0] === 'chad'));
+  assert.ok(regions.some((s) => s.values[0] === 'manual-country'));
+  const firstRisk=statements.findIndex((s) => s.query.startsWith('INSERT INTO risk_radar'));
+  assert.equal(firstRisk,6);
+  assert.ok(statements.filter((s) => s.query.startsWith('UPDATE risk_radar')).every((s) => s.query.includes('region_slug IS NULL')));
+});
+test('country slugs are stable and ignore accents', () => {
+  assert.equal(countrySlug('Afghanistan'),'afghanistan');
+  assert.equal(countrySlug(' Côte d’Ivoire '),'cote-d-ivoire');
+});
+
+test('risk selection cannot cross country boundaries or substitute an invalid selection', () => {
+  const records=[{risk_id:'R1',region_slug:'afghanistan'},{risk_id:'R2',region_slug:'chad'}];
+  assert.equal(selectCountryRisk(records,'afghanistan').risk_id,'R1');
+  assert.equal(selectCountryRisk(records,'chad','R2').risk_id,'R2');
+  assert.equal(selectCountryRisk(records,'afghanistan','R2'),null);
+  assert.equal(selectCountryRisk(records,'chad','missing'),null);
+  assert.equal(selectCountryRisk([], 'chad'),null);
 });

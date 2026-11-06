@@ -1,6 +1,7 @@
 ---
 import Layout from "../../../layouts/Layout.astro";
 import AdminAccess from "../../../components/AdminAccess.astro";
+import RiskQuestionnaires from "../../../components/RiskQuestionnaires.astro";
 import Participation from "../../../components/Participation.astro";
 import { configured } from "../../../server/db.js";
 import { isAdmin } from "../../../server/auth.js";
@@ -11,16 +12,14 @@ const authenticated = ready && isAdmin(Astro.cookies);
 let region = null;
 let loadError = false;
 if (authenticated) {
-  try { region = await regionBoard(Astro.params.slug); }
+  try { region = await regionBoard(Astro.params.slug, (Astro.url.searchParams.get("risk") || "").slice(0, 40)); }
   catch { loadError = true; }
 }
 if (authenticated && !loadError && !region) return new Response("Region not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
 
 const view = Astro.url.searchParams.get("view");
 const showReports = view === "reports";
-const showQuestionnaires = view === "questionnaires";
-const current = region?.questionnaires.filter((item) => !item.sent) ?? [];
-const sent = region?.questionnaires.filter((item) => item.sent) ?? [];
+
 ---
 
 <Layout title={region?.name || "Region"}>
@@ -65,39 +64,7 @@ const sent = region?.questionnaires.filter((item) => item.sent) ?? [];
           <div class="actions"><button>Save report</button></div>
         </form>
       </section>
-      <section class="card" aria-labelledby="questions-heading">
-        <h2 id="questions-heading">Questionnaires</h2>
-        {showQuestionnaires ? (
-          <>
-            <p class="muted">Sent questionnaires for this region.</p>
-            {!sent.length && <p>No sent questionnaires.</p>}
-            <ul>
-              {sent.map((item) => (
-                <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent}</li>
-              ))}
-            </ul>
-            <p><a href={`/admin/regions/${region.slug}`}>Back to current questionnaires</a></p>
-          </>
-        ) : (
-          <>
-            <h3>Current</h3>
-            {!current.length && <p>No questionnaire in progress.</p>}
-            <ul>
-              {current.map((item) => (
-                <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · opened {item.opened}</li>
-              ))}
-            </ul>
-            <p><a href={`/admin/regions/${region.slug}?view=questionnaires`}>Questionnaire history</a></p>
-            <form method="post" action="/api/admin/region-questionnaire">
-              <h3>Build new questionnaire</h3>
-              <input type="hidden" name="region" value={region.slug} />
-              <label for="topic">Topic</label>
-              <input id="topic" name="topic" required maxlength="180" />
-              <div class="actions"><button>Create questionnaire</button></div>
-            </form>
-          </>
-        )}
-      </section>
+      <div><RiskQuestionnaires region={region} /></div>
       <section class="card" aria-labelledby="contacts-heading">
         <h2 id="contacts-heading">Contacts</h2>
         <p>Experts for {region.name}. Sending a questionnaire assigns it to these people.</p>

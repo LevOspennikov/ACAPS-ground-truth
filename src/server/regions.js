@@ -1,3 +1,4 @@
+import { countrySlug, selectCountryRisk } from "../data/countries.js";
 import { randomUUID } from "node:crypto";
 import { isAdmin } from "./auth.js";
 import { db, configured } from "./db.js";
@@ -21,15 +22,14 @@ export function formatDate(value) {
   return date.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
-export function slugify(name) {
-  return name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 80);
-}
+export const slugify = countrySlug;
 
-export async function listRegions(query) {
+export async function listRegions(query = "") {
   const term = query.replace(/[%_]/g, "").trim();
   const sql = db();
-  if (!term) return sql`SELECT slug, name FROM regions ORDER BY name`;
-  return sql`SELECT slug, name FROM regions WHERE name ILIKE ${"%" + term + "%"} ORDER BY name`;
+  return sql`SELECT g.slug, g.name, count(r.risk_id)::int AS risks FROM regions g
+    LEFT JOIN risk_radar r ON r.region_slug = g.slug
+    WHERE g.name ILIKE ${"%" + term + "%"} GROUP BY g.slug ORDER BY g.name`;
 }
 
 export async function createRegion(name) {
@@ -42,12 +42,16 @@ export async function createRegion(name) {
   return { slug };
 }
 
-export async function regionBoard(slug) {
+export async function regionBoard(slug, riskId = "") {
   const sql = db();
   const [region] = await sql`SELECT slug, name FROM regions WHERE slug = ${slug}`;
   if (!region) return null;
   const reports = await sql`SELECT id, title, summary, published_on FROM reports WHERE region_slug = ${slug} ORDER BY published_on DESC, created_at DESC`;
-  const questionnaires = await sql`SELECT id, title, created_at, sent_at FROM questionnaires WHERE region_slug = ${slug} ORDER BY created_at DESC`;
+  const risks = await sql`SELECT * FROM risk_radar WHERE region_slug = ${slug} ORDER BY risk_id`;
+  const selectedRisk = selectCountryRisk(risks, slug, riskId);
+  const questionnaires = selectedRisk ? await sql`SELECT id, title, created_at, sent_at FROM questionnaires
+    WHERE region_slug = ${slug} AND risk_id = ${selectedRisk.risk_id} ORDER BY created_at DESC` : [];
+  const unlinked = await sql`SELECT id, title FROM questionnaires WHERE (region_slug = ${slug} OR region_slug IS NULL) AND risk_id IS NULL ORDER BY created_at DESC`;
   const contacts = await sql`SELECT e.id, e.pseudonym AS name, e.focus,
     count(q.id)::int AS invited,
     count(ans.assignment_id) FILTER (WHERE q.id IS NOT NULL)::int AS joined
@@ -60,6 +64,7 @@ export async function regionBoard(slug) {
     ORDER BY e.pseudonym`;
   return {
     ...region,
+    risks, selectedRisk, unlinked,
     reports: reports.map((report) => ({ ...report, date: formatDate(report.published_on) })),
     questionnaires: questionnaires.map((item) => ({ id: item.id, topic: item.title, opened: formatDate(item.created_at), sent: item.sent_at ? formatDate(item.sent_at) : "" })),
     contacts,
@@ -125,12 +130,13 @@ export async function contactPage(slug, id) {
   };
 }
 
-export async function createQuestionnaire(slug, topic) {
+export async function createQuestionnaire(slug, topic, riskId) {
   const sql = db();
-  const [region] = await sql`SELECT slug FROM regions WHERE slug = ${slug}`;
-  if (!region) return null;
   const id = randomUUID();
-  await sql`INSERT INTO questionnaires (id, title, context, region_slug) VALUES (${id}, ${topic}, '', ${slug})`;
+  const [created] = await sql`INSERT INTO questionnaires (id, title, context, region_slug, risk_id)
+    SELECT ${id}, ${topic}, r.rationale, r.region_slug, r.risk_id FROM risk_radar r
+    WHERE r.risk_id = ${riskId} AND r.region_slug = ${slug} RETURNING id`;
+  if (!created) return null;
   return id;
 }
 
@@ -138,7 +144,7 @@ export async function editorPage(slug, id) {
   if (!isUuid(id)) return null;
   const sql = db();
   const [region] = await sql`SELECT slug, name FROM regions WHERE slug = ${slug}`;
-  const [questionnaire] = await sql`SELECT id, title, created_at, sent_at FROM questionnaires WHERE id = ${id}::uuid AND region_slug = ${slug}`;
+  const [questionnaire] = await sql`SELECT q.id, q.title, q.created_at, q.sent_at, q.risk_id, r.risk_title FROM questionnaires q LEFT JOIN risk_radar r ON r.risk_id = q.risk_id WHERE q.id = ${id}::uuid AND q.region_slug = ${slug}`;
   if (!region || !questionnaire) return null;
   const questions = await sql`SELECT id, type, prompt, options, placeholder FROM questions WHERE questionnaire_id = ${id}::uuid ORDER BY position`;
   const [{ count }] = await sql`SELECT count(*)::int AS count FROM experts WHERE region_slug = ${slug}`;
@@ -148,6 +154,8 @@ export async function editorPage(slug, id) {
     questionnaire: {
       id: questionnaire.id,
       topic: questionnaire.title,
+      risk_id: questionnaire.risk_id,
+      risk_title: questionnaire.risk_title,
       opened: formatDate(questionnaire.created_at),
       sent: questionnaire.sent_at ? formatDate(questionnaire.sent_at) : "",
       questions: questions.map((question) => ({
