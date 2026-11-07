@@ -30,6 +30,7 @@ const questionnaire = page?.questionnaire;
         <p><a href={questionnaire.risk_id ? `/admin/regions/${region.slug}?risk=${encodeURIComponent(questionnaire.risk_id)}` : `/admin/regions/${region.slug}`}>Back to {region.name}</a></p>
         {questionnaire.risk_id ? <p class="notice"><strong>{questionnaire.risk_id}</strong> · {questionnaire.risk_title}</p> : <p class="notice">This existing questionnaire has no risk yet. Link it from the country page.</p>}
         <h1>{questionnaire.topic}</h1>
+        <p><a href={`/admin/results/${questionnaire.id}`}>Results and rounds →</a></p>
         <p class="muted">Opened {questionnaire.opened} · {region.name}</p>
         {questionnaire.sent && <p class="notice" role="status">First invitations created on {questionnaire.sent}. Questions are locked; additional recipients and return links can be selected below.</p>}
         {error === "options" && <p class="notice error" role="alert">Multiple choice needs at least two options, one per line.</p>}

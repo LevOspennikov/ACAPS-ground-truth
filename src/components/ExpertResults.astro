@@ -1,9 +1,10 @@
 ---
 import { expertResults } from '../server/expert-results.js';
 import { resultsMarkup } from '../lib/expert-results-view.js';
+const { questionId = null, frozen = false, refreshHref = '/questionnaire' } = Astro.props;
 let result = null;
 let failure = '';
-try { result = await expertResults(Astro.cookies); }
+try { result = await expertResults(Astro.cookies, { questionId, frozen }); }
 catch (error) {
   failure = error.code === 'invalid_results_configuration'
     ? 'Results are withheld because server configuration needs attention. Contact your organiser.'
@@ -11,9 +12,9 @@ catch (error) {
 }
 ---
 <section aria-labelledby="group-results-title">
-  <h2 id="group-results-title">Group results</h2>
-  <p>Answer distributions include final submissions only. Written responses stay private.</p>
-  <p role="status">{result ? 'Refresh this page to see the latest results.' : failure || 'Your session ended or access changed. Open a fresh invitation to view results.'}</p>
-  <p class="muted">Last updated: <time datetime={result?.updatedAt}>{result ? new Date(result.updatedAt).toUTCString() : 'Not yet available'}</time> · <a href="/questionnaire">Refresh results</a></p>
-  <div set:html={result ? resultsMarkup(result.questions) : ''} />
+  <h2 id="group-results-title">{frozen ? 'Round 1 feedback for this question' : 'Group results'}</h2>
+  <p>{frozen ? 'Feedback was captured when Round 2 opened and stays the same throughout reassessment.' : 'Answer distributions include final submissions only.'} Written responses stay private.</p>
+  {(!result || !frozen) && <p role="status">{result ? 'Refresh this page to see the latest results.' : failure || 'Your session ended or access changed. Open a fresh invitation to view results.'}</p>}
+  <p class="muted">{frozen ? 'Captured' : 'Last updated'}: <time datetime={result?.updatedAt}>{result ? new Date(result.updatedAt).toUTCString() : 'Not yet available'}</time> · <a href={refreshHref}>Refresh results</a></p>
+  <div set:html={result ? resultsMarkup(result.questions, frozen ? { withheldMessage: 'Feedback is withheld because too few answers were available when Round 2 started.' } : {}) : ''} />
 </section>

@@ -34,8 +34,9 @@ if (!assignment && !loadFailed) {
 }
 
 const questions = assignment?.questions || [];
-const answers = { ...(assignment?.round_two_answers || {}) };
 const originalAnswers = assignment?.round_one_answers || {};
+// Retain the original assessment unless the expert explicitly revises it.
+const answers = { ...originalAnswers, ...(assignment?.round_two_answers || {}) };
 
 const total = questions.length;
 
@@ -162,7 +163,7 @@ const saved = Astro.url.searchParams.has('saved');
         <p>
           {loadFailed
             ? 'The server could not load your assessment.'
-            : 'Complete Round 1 and open your private invitation first.'}
+            : 'Round 2 is available after your organiser starts it and you submit Round 1. Return to your questionnaire through your private invitation.'}
         </p>
       </>
     ) : (
@@ -171,10 +172,10 @@ const saved = Astro.url.searchParams.has('saved');
 
         <h1>{assignment.title}</h1>
 
-        <p>
+        {!assignment.round_two_submitted_at && <p>
           Review the anonymized group assessment, then reconsider
           your original answers using your own expertise.
-        </p>
+        </p>}
 
         {assignment.round_two_submitted_at ? (
           <section class="notice" role="status">
@@ -183,15 +184,12 @@ const saved = Astro.url.searchParams.has('saved');
               Your revised answers have been submitted.
               Your original Round 1 answers remain preserved.
             </p>
-            <ExpertResults />
+            <a href="/questionnaire">Back to your questionnaire</a>
+            <h2>Your submitted Round 2 answers</h2>
+            {questions.map((q) => <section><h3>{q.prompt}</h3><p class="answer-context">{answerLabel(q, answers[q.id])}</p></section>)}
           </section>
         ) : (
           <>
-            <section class="result-card">
-              <h2>Round 1 group feedback</h2>
-              <ExpertResults />
-            </section>
-
             <form method="post" action="/round-two">
               <input
                 type="hidden"
@@ -214,10 +212,13 @@ const saved = Astro.url.searchParams.has('saved');
               {question ? (
                 <>
                   <h2>Reassess your answer</h2>
+                  <p>Your answer is prefilled. Keep it or revise it using your expertise and any feedback below.</p>
 
                   <p class="muted">
                     Question {step + 1} of {total}
                   </p>
+
+                  {question.type === 'single' && <ExpertResults questionId={question.id} frozen={true} refreshHref="/round-two" />}
 
                   <section class="result-card">
                     <h3>Your Round 1 answer</h3>
@@ -251,7 +252,7 @@ const saved = Astro.url.searchParams.has('saved');
                   ) : (
                     <>
                       <label for="answer">
-                        {question.prompt}
+                        {question.prompt}{question.required === false ? ' (optional)' : ''}
                       </label>
 
                       <textarea
@@ -259,6 +260,7 @@ const saved = Astro.url.searchParams.has('saved');
                         name="answer"
                         rows="4"
                         maxlength="4000"
+                        placeholder={question.placeholder}
                       >{answers[question.id] || ''}</textarea>
                     </>
                   )}

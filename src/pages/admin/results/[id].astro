@@ -35,7 +35,7 @@ if (validId(Astro.params.id)) {
 
 // Keep the original results available even if
 // the Round 2 database is not ready yet.
-if (result) {
+if (result?.questionnaire.round_two_started_at) {
   try {
     const comparisonResult = await loadRoundComparison(
       Astro.params.id
@@ -95,7 +95,7 @@ if (!result) {
       <!-- Completion statistics -->
 
       <section class="card">
-        <h2>Round 1 completion</h2>
+        <h2>{result.questionnaire.round_two_started_at ? 'Round 1 completion' : 'Completion'}</h2>
 
         <p class="stat">
           {result.summary.submitted}
@@ -119,9 +119,27 @@ if (!result) {
         </p>
       </section>
 
+      <section class="card">
+        <h2>Round 2</h2>
+        {Astro.url.searchParams.get('error') === 'round-two' && <p class="notice error" role="alert">Add questions and collect at least one submitted response before starting Round 2.</p>}
+        {result.questionnaire.round_two_started_at ? <>
+          <p>Started {new Date(result.questionnaire.round_two_started_at).toUTCString()}. Round 1 feedback is frozen for reassessment.</p>
+          <p class="stat">{result.roundTwo.submitted} / {result.roundTwo.eligible}</p>
+          <p>submitted · {result.roundTwo.drafts} in progress · {result.roundTwo.eligible - result.roundTwo.submitted - result.roundTwo.drafts} not started</p>
+          <p class="muted">Experts who submit Round 1 can return through their existing questionnaire page to access Round 2.</p>
+        </> : <>
+          <p>The questionnaire currently uses a single round. Start reassessment when the panel is ready. This captures submitted Round 1 choice results once, so everyone receives the same feedback.</p>
+          <form method="post" action="/api/admin/start-round-two">
+            <input type="hidden" name="questionnaire" value={result.questionnaire.id} />
+            <button disabled={!result.summary.submitted || !result.questionnaire.questions.length}>Start Round 2</button>
+          </form>
+          {!result.summary.submitted && <p class="muted">Collect at least one submitted response first.</p>}
+        </>}
+      </section>
+
       <!-- NEW: Round comparison dashboard -->
 
-      <section aria-labelledby="comparison-heading">
+      {result.questionnaire.round_two_started_at && <section aria-labelledby="comparison-heading">
 
         <h2 id="comparison-heading">
           Round 1 vs Round 2 — Comparative Analysis
@@ -131,6 +149,7 @@ if (!result) {
           Explore how expert predictions changed
           after reviewing anonymized group feedback.
         </p>
+        <p class="muted">Answer changes describe revisions, not whether the group reached greater agreement.</p>
 
         <p class="muted">
           Comparisons use only experts who submitted
@@ -158,18 +177,18 @@ if (!result) {
           ))
         )}
 
-      </section>
+      </section>}
 
       <hr />
 
       <!-- Existing Round 1 distributions -->
 
-      <h2>Round 1 — Original Predictions</h2>
+      <h2>{result.questionnaire.round_two_started_at ? 'Round 1 — Original Predictions' : 'Answer distributions'}</h2>
 
       <p class="muted">
-        These distributions include all submitted
-        Round 1 answers, including experts who have
-        not completed Round 2.
+        {result.questionnaire.round_two_started_at
+          ? 'These distributions include all submitted Round 1 answers, including experts who have not completed Round 2.'
+          : 'These distributions include all submitted answers.'}
       </p>
 
       {

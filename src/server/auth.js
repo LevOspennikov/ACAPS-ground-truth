@@ -18,15 +18,17 @@ export function denyUnlessAdmin(request, cookies) {
   if (!sameOrigin(request) || !configured() || !isAdmin(cookies)) return reject('Forbidden', 403);
   return null;
 }
-export async function expertAssignment(cookies) {
+export async function expertAssignment(cookies, getSql = db) {
   const value = cookies.get('expert')?.value;
   if (!value) return null;
-  const sql = db();
+  const sql = getSql();
   const [assignment] = await sql`SELECT a.id, q.title, q.context AS description, q.questions,
+    q.round_two_started_at, rt.submitted_at AS round_two_submitted_at,
     e.profile_mode, coalesce(c.title, g.name, 'Questionnaire') AS crisis_title, coalesce(c.country, g.name, '') AS country, r.answers, r.progress_step, r.submitted_at, r.updated_at
     FROM expert_sessions s JOIN assignments a ON a.id = s.assignment_id
     JOIN experts e ON e.id = a.expert_id JOIN questionnaires q ON q.id = a.questionnaire_id
     LEFT JOIN crises c ON c.id = q.crisis_id LEFT JOIN regions g ON g.slug = q.region_slug LEFT JOIN responses r ON r.assignment_id = a.id
+    LEFT JOIN round_two_responses rt ON rt.assignment_id = a.id
     WHERE s.token_hash = ${hash(value)} AND s.expires_at > now() AND e.active = true`;
   return assignment || null;
 }
@@ -49,12 +51,12 @@ export async function invitationMatchesSession(cookies, invitation, getSql = db)
  * Load Round 2 for an authenticated expert.
  * Only experts who submitted Round 1 can access Round 2.
  */
-export async function roundTwoAssignment(cookies) {
+export async function roundTwoAssignment(cookies, getSql = db) {
   const session = cookies.get('expert')?.value;
 
   if (!session) return null;
 
-  const sql = db();
+  const sql = getSql();
 
   const [assignment] = await sql`
     SELECT
@@ -92,6 +94,7 @@ export async function roundTwoAssignment(cookies) {
       s.token_hash = ${hash(session)}
       AND s.expires_at > now()
       AND e.active = true
+      AND q.round_two_started_at IS NOT NULL
   `;
 
   return assignment || null;

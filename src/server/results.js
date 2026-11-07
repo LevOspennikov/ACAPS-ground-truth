@@ -2,8 +2,8 @@
 import { db } from './db.js';
 
 // Never join expert identity fields into answer results.
-export async function questionnaireResults(id) {
-  const sql = db();
+export async function questionnaireResults(id, getSql = db) {
+  const sql = getSql();
 
   const [questionnaire] = await sql`
     SELECT
@@ -17,7 +17,7 @@ export async function questionnaireResults(id) {
 
   if (!questionnaire) return null;
 
-  const [summary, distributions, responses] =
+  const [summary, distributions, responses, roundTwo] =
     await sql.transaction([
       sql`
         SELECT
@@ -65,14 +65,21 @@ export async function questionnaireResults(id) {
           r.submitted_at DESC,
           r.assignment_id
         LIMIT 100
-      `
+      `,
+      sql`SELECT count(*)::int AS eligible,
+        count(rt.assignment_id) FILTER (WHERE rt.submitted_at IS NULL)::int AS drafts,
+        count(rt.submitted_at)::int AS submitted
+        FROM assignments a JOIN responses r ON r.assignment_id = a.id AND r.submitted_at IS NOT NULL
+        LEFT JOIN round_two_responses rt ON rt.assignment_id = a.id
+        WHERE a.questionnaire_id = ${id}`
     ]);
 
   return {
     questionnaire,
     summary: summary[0],
     distributions,
-    responses
+    responses,
+    roundTwo: roundTwo[0],
   };
 }
 
