@@ -5,6 +5,7 @@ import template from '../data/questions.js';
 import { coverageEligibility, expertCoverage } from './coverage.js';
 import { validateQuestions } from './answers.js';
 import { isUuid } from './ids.js';
+import { emailInvitation } from './invitation-email.js';
 
 export const validId = isUuid;
 export async function categories() { return db()`SELECT * FROM categories ORDER BY archived, lower(name)`; }
@@ -61,7 +62,7 @@ export async function assignQuestionnaire(expertId, questionnaireId) {
   if (!assignment) throw new Error('Choose an active user with matching country and risk coverage, and a published questionnaire.');
   return assignment.id;
 }
-export async function generateInvitation(assignmentId) {
+export async function generateInvitation(assignmentId, origin) {
   const sql = db();
   const invitation = token();
   const result = await sql.transaction([
@@ -70,9 +71,14 @@ export async function generateInvitation(assignmentId) {
     sql`INSERT INTO invitations (token_hash, assignment_id, expires_at)
       SELECT ${hash(invitation)}, a.id, now() + interval '48 hours' FROM assignments a JOIN experts e ON e.id = a.expert_id
       WHERE a.id = ${assignmentId} AND e.active = true RETURNING assignment_id`,
+    sql`SELECT e.profile_mode, e.email, e.active, q.title FROM assignments a
+      JOIN experts e ON e.id = a.expert_id JOIN questionnaires q ON q.id = a.questionnaire_id
+      WHERE a.id = ${assignmentId}`,
   ]);
   if (!result[2].length) throw new Error('No active user found for this assignment.');
-  return invitation;
+  const expert = result[3][0];
+  const emailStatus = await emailInvitation({ expert, token: invitation, title: expert?.title, origin });
+  return { token: invitation, emailStatus };
 }
 export async function setUserActive(id, active) {
   const sql = db();
