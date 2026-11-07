@@ -18,7 +18,7 @@ const riskHref = (riskId) => links === "overview"
 ---
 
 <section class={compact ? undefined : "risk-workspace-overview"} aria-labelledby="risk-heading">
-  <h2 id="risk-heading">Risks in {region.name}</h2>
+  <h2 id="risk-heading">{compact ? `Risks in ${region.name}` : "Risks"}</h2>
   {region.risks.length ? (compact ? <nav class="risk-list" aria-label={`Risks in ${region.name}`}>
       <ul>{region.risks.map((item) => (
         <li><a class="risk-list-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined} title={item.risk_title}><span class="risk-list-id">{item.risk_id}</span><span class="risk-list-title">{shortRiskTitle(item.risk_title)}</span><span class="risk-list-arrow" aria-hidden="true">→</span></a></li>

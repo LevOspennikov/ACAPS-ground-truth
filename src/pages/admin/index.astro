@@ -35,7 +35,7 @@ if (authenticated) {
       {!regions.length && <p class="notice">No countries found.</p>}
       <div id="country-risk-panel">
         {country && !selected && <p class="notice error">Country not found. Choose a country above.</p>}
-        {selected && <><h2>{selected.name}</h2><p><a href={`/admin/regions/${selected.slug}`}>Open {selected.name} →</a></p><RiskQuestionnaires region={selected} links="overview" /></>}
+        {selected && <><h2><a class="country-heading-link" href={`/admin/regions/${selected.slug}`}>{selected.name}</a></h2><RiskQuestionnaires region={selected} links="overview" /></>}
       </div>
     </>}
   </AdminAccess>
