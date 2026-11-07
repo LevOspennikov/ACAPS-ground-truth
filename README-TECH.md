@@ -2,7 +2,55 @@
 
 Minimal deployment prototype: Astro server-rendered pages on Vercel, Neon PostgreSQL, plain CSS, and native HTML forms. No frontend framework, client JavaScript, or email service is required.
 
-## Local setup
+## Local setup with an embedded test database
+
+This is the quickest way to run the application locally. It uses PGlite (embedded PostgreSQL) and synthetic data; no Neon account, Docker, `.env` file, or database credentials are needed. Install Node.js 24 LTS and npm first.
+
+From a terminal, run these commands in order. If you already have the repository, skip the clone and change into your existing checkout.
+
+```sh
+git clone https://github.com/LevOspennikov/ACAPS-ground-truth.git
+cd ACAPS-ground-truth
+node --version
+npm ci
+npm run dev:test
+```
+
+Leave that terminal running, then open **http://127.0.0.1:4322/admin**.
+
+| Setting | Local test value |
+| --- | --- |
+| Admin password | **`local-test-admin`** |
+| Database | PGlite, stored in `.test-data/pglite/` |
+| Environment | Astro test mode (`--mode test`) |
+
+The launcher applies the repository's SQL schemas and seeds twelve risks, eight anonymous experts with submitted answers, and **Local Test Expert**, assigned to the Afghanistan `R0353` questionnaire with no submitted answers. To try the expert flow:
+
+1. Sign in with `local-test-admin`, open **Users**, and select **Local Test Expert**.
+2. Select **Generate magic link**, then copy and open the displayed link locally. No email is sent.
+3. Accept the invitation, answer questions, save progress, and reload to check that the server retained it.
+4. Review and submit, then view group distributions. Return to admin to inspect completion and results.
+
+Press **Ctrl+C** in the terminal to stop. To start again from the repository directory:
+
+```sh
+npm run dev:test
+```
+
+Test records persist across restarts. Sign in again after restarting: each launch creates a new admin signing secret. Stored expert sessions remain available until they expire or are revoked. Run only one embedded server against this data directory at a time.
+
+To erase **only the local test database** and restore the original synthetic data, stop the test server with Ctrl+C first, then run these commands from the repository directory:
+
+```sh
+rm -rf .test-data
+npm run dev:test
+```
+
+The launcher opts in with `TEST_DATABASE=embedded`, binds to loopback on port 4322, and disables Resend and AI question generation. Use the seeded questionnaire or add questions manually. Embedded mode takes precedence over any cloud database URL loaded from environment files, so this command never uses Neon. The application rejects it outside test mode, in production builds, and in Vercel environments. PGlite is a development dependency and is excluded from the production bundle. Normal `npm run dev` and deployments continue to use Neon; do not configure the test setting in deployed environments.
+
+`.test-data/` is git-ignored. The embedded database exercises real SQL, authentication and server-side saves, but does not reproduce Neon's network behavior or production concurrency. `npm test` includes an isolated in-memory PGlite check for schema compatibility, repeatable seeding, transaction rollback and read-only queries; it does not access the persistent demo directory or a cloud database.
+
+## Local setup with Neon
 
 Use Node.js 22.23.4+ (Node 24 LTS recommended).
 
@@ -13,7 +61,7 @@ Use Node.js 22.23.4+ (Node 24 LTS recommended).
 5. Run `npm run db:setup` to create the application tables and seed the twelve risk radar records. Alternatively, paste `db/schema.sql` into the Neon SQL Editor. Setup is idempotent and does not delete existing records.
 6. Run `npm run dev`, then open `http://localhost:4321`.
 
-The homepage works without environment variables as a deployment smoke check. Database-backed functionality requires all three variables and the schema.
+The homepage works without environment variables as a deployment smoke check. The normal Neon-backed flow requires all three variables and the schema; the embedded test option above supplies a local database and credentials automatically.
 
 ## Deploy to Vercel + Neon
 
@@ -71,7 +119,7 @@ Local and Preview builds never trigger this reset. To stop deleting data, set `R
 7. Deactivate a user to revoke all invitations/sessions and block access; reactivation requires a new link.
 8. Confirm that users and links disappear on the next production deployment while prototype reset mode remains enabled.
 
-Run `npm test` for validation, privacy-mode and reset-policy tests, and `npm run build` to validate Vercel output. A live Neon database is required for the end-to-end flow. Local builds preserve the database; opted-in production builds reset it.
+Run `npm test` for validation, privacy-mode, embedded-database and reset-policy tests, and `npm run build` to validate Vercel output. Use `npm run dev:test` for the local end-to-end flow without cloud credentials, or configure Neon for the normal flow. Local builds preserve the database; opted-in production builds reset it.
 
 ## Country → risk → questionnaire workspace
 

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "astro dev",
+    "dev:test": "node scripts/dev-embedded.js",
     "build": "astro build && node scripts/reset-db-on-deploy.js && node scripts/seed-risk-radar.js",
     "db:setup": "node --env-file=.env scripts/setup-db.js && node --env-file=.env scripts/seed-demo.js",
     "db:seed-demo": "node --env-file=.env scripts/seed-demo.js",
@@ -28,5 +29,8 @@
     "@vercel/routing-utils": {
       "path-to-regexp": "6.3.0"
     }
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.15"
   }
 }

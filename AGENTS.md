@@ -46,6 +46,6 @@ Profiles currently support admin-managed named and anonymous modes. Country/risk
 ## Development and verification
 - Keep database/authentication/validation services in `src/server/`, pages and form endpoints in `src/pages/`, and schema/setup changes in `db/` and `scripts/`.
 - Use `npm run dev` for local development, `npm test` for automated checks, and `npm run build` for Vercel output validation. Use the Node version documented in [README-TECH.md](README-TECH.md).
-- Database-backed end-to-end verification requires a separately configured Neon database. Email tests should mock delivery; avoid sending invitations as a side effect of tests.
+- Use `npm run dev:test` for database-backed local verification with synthetic data and test-only embedded PostgreSQL, or configure a separate Neon database for the normal flow. See [README-TECH.md](README-TECH.md) for commands and the local test password. Email tests should mock delivery; avoid sending invitations as a side effect of tests.
 - Read the deployment/reset instructions before changing schema or build scripts. With `RESET_DATABASE_ON_DEPLOY=true`, production builds intentionally erase application data. Local and preview builds must never trigger this reset or automatic production seeding.
 - Preserve saved answers, submitted-response locks, and valid sessions when regenerating invitation links. Deactivation must block expert access.
