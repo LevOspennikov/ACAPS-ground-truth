@@ -255,6 +255,26 @@ export async function addQuestion(slug, questionnaireId, question) {
   return added ? id : null;
 }
 
+export async function updateQuestion(slug, questionnaireId, questionId, question) {
+  if (!isUuid(questionId)) return null;
+  const sql = db();
+  const item = await openQuestionnaire(sql, slug, questionnaireId);
+  if (!item || item.sent_at) return null;
+  const entry = {
+    id: questionId,
+    type: question.type,
+    prompt: question.prompt,
+    options: question.type === "single" ? question.options : [],
+    placeholder: question.type === "text" ? question.placeholder : "",
+  };
+  const [updated] = await sql`UPDATE questionnaires SET questions = (
+    SELECT jsonb_agg(CASE WHEN element->>'id' = ${questionId} THEN ${JSON.stringify(entry)}::jsonb ELSE element END ORDER BY ordinality)
+    FROM jsonb_array_elements(questionnaires.questions) WITH ORDINALITY AS t(element, ordinality)
+  ) WHERE id = ${questionnaireId}::uuid AND region_slug = ${slug} AND sent_at IS NULL
+    AND questions @> ${JSON.stringify([{ id: questionId }])}::jsonb RETURNING id`;
+  return updated ? item : null;
+}
+
 export async function removeQuestion(slug, questionnaireId, questionId) {
   if (!isUuid(questionId)) return null;
   const sql = db();
