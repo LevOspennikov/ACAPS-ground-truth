@@ -17,7 +17,7 @@ const riskHref = (riskId) => links === "overview"
   : `/admin/regions/${region.slug}?risk=${encodeURIComponent(riskId)}`;
 ---
 
-<section aria-labelledby="risk-heading">
+<section class={compact ? undefined : "risk-workspace-overview"} aria-labelledby="risk-heading">
   <h2 id="risk-heading">Risks in {region.name}</h2>
   {region.risks.length ? (compact ? <nav class="risk-list" aria-label={`Risks in ${region.name}`}>
       <ul>{region.risks.map((item) => (
@@ -26,8 +26,8 @@ const riskHref = (riskId) => links === "overview"
     </nav> : <nav class="region-grid" aria-label="Risks">
       {region.risks.map((item) => <a class="region-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined}>{item.risk_id} · {item.risk_title}</a>)}
     </nav>) : <p class="notice">No risks for this country yet. Add one below.</p>}
-  <details class={compact ? "add-risk-disclosure" : "card"} id="add-risk">
-    <summary>{compact ? "Add another risk" : `Add another risk in ${region.name}`}</summary>
+  <details class={compact ? "add-risk-disclosure" : "overview-new-risk"} id="add-risk">
+    <summary class={compact ? undefined : "button"}>{compact ? "Add another risk" : "New Risk"}</summary>
     <form method="post" action="/api/admin/region-risk" data-astro-reload>
       <input type="hidden" name="region" value={region.slug} />
       <p class="muted">Country is fixed to {region.name}. Risk ID and title are required; remaining fields are optional.</p>
