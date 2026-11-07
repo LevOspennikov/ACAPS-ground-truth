@@ -1,8 +1,17 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import { configured } from '../server/db.js';
+import { invitationMatchesSession } from '../server/auth.js';
 const invitation = Astro.url.searchParams.get('token');
 const valid = invitation && /^[a-f0-9]{64}$/.test(invitation);
+let failed = false;
+if (valid && configured()) {
+  try {
+    if (await invitationMatchesSession(Astro.cookies, invitation)) return Astro.redirect('/questionnaire', 303);
+  } catch { failed = true; Astro.response.status = 503; }
+}
 ---
 <Layout title="Expert invitation"><p class="eyebrow">PRIVATE EXPERT INVITATION</p><h1>Your perspective matters.</h1>
+  {failed && <p role="alert">We could not check your existing session. Retry shortly, or continue below.</p>}
   {valid ? <form class="card" method="post" action="/api/expert/accept"><h2>Open your questionnaire</h2><p>This single-use invitation establishes a private session in this browser for seven days. Only open it on a device you trust.</p><input type="hidden" name="token" value={invitation} /><button>Accept invitation</button></form> : <p>This invitation is invalid. Ask your organiser for a new link.</p>}
 </Layout>
