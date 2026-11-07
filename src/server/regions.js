@@ -2,7 +2,7 @@ import { countrySlug, selectCountryRisk } from "../data/countries.js";
 import { randomUUID } from "node:crypto";
 import { db } from "./db.js";
 import { isUuid } from "./ids.js";
-import { describeAnswers } from "./answers.js";
+import { answerLabel, describeAnswers, questionOptions, parseQuestions, readAnswers } from "./answers.js";
 
 export function formatDate(value) {
   if (!value) return "";
@@ -159,32 +159,47 @@ export async function riskAnswers(slug, riskId) {
   for (const row of rows) {
     let questionnaire = questionnaires.find((item) => item.id === row.questionnaire_id);
     if (!questionnaire) {
-      questionnaire = { id: row.questionnaire_id, topic: row.topic, invited: 0, replies: [] };
+      questionnaire = { id: row.questionnaire_id, topic: row.topic, invited: 0, questions: null, replies: [], distributions: [] };
       questionnaires.push(questionnaire);
     }
     if (!row.expert) continue;
     questionnaire.invited += 1;
     if (!row.submitted_at) continue;
-    questionnaire.replies.push({
-      expert: row.expert,
-      date: formatDate(row.submitted_at),
-      lines: describeAnswers(row.questions, row.answers),
-    });
+    const parsedQuestions = parseQuestions(row.questions);
+    const answers = readAnswers(row.answers);
+    if (!questionnaire.questions) questionnaire.questions = parsedQuestions;
+    questionnaire.replies.push({ expert: row.expert, date: formatDate(row.submitted_at), answers });
+    for (const question of parsedQuestions) {
+      if (question.type !== "single") continue;
+      const value = answers[question.id];
+      if (!value) continue;
+      const bucket = questionnaire.distributions.find((d) => d.question_id === question.id && d.answer === value);
+      if (bucket) bucket.total += 1;
+      else questionnaire.distributions.push({ question_id: question.id, answer: value, total: 1 });
+    }
   }
   return {
     risk_id: risk.risk_id,
     risk_title: risk.risk_title,
     region: { slug: risk.slug, name: risk.region_name },
-    questionnaires: questionnaires.map((questionnaire) => {
-      const prompts = questionnaire.replies[0]?.lines.map((line) => line.prompt) || [];
-      return {
-        ...questionnaire,
-        questions: prompts.map((prompt, index) => ({
-          prompt,
-          replies: questionnaire.replies.map((reply) => ({ expert: reply.expert, date: reply.date, value: reply.lines[index]?.value || "No answer provided" })),
+    questionnaires: questionnaires.map((questionnaire) => ({
+      id: questionnaire.id,
+      topic: questionnaire.topic,
+      invited: questionnaire.invited,
+      submitted: questionnaire.replies.length,
+      distributions: questionnaire.distributions,
+      questions: (questionnaire.questions || []).map((question) => ({
+        id: question.id,
+        prompt: question.prompt || "Question",
+        type: question.type || "text",
+        options: question.type === "single" ? questionOptions(question) : [],
+        replies: questionnaire.replies.map((reply) => ({
+          expert: reply.expert,
+          date: reply.date,
+          value: answerLabel({ ...question, type: question.type || "text", options: question.type === "single" ? questionOptions(question) : [] }, String(reply.answers[question.id] ?? "")),
         })),
-      };
-    }),
+      })),
+    })),
   };
 }
 
