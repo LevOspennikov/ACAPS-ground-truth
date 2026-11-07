@@ -63,6 +63,12 @@ Use Node.js 22.23.4+ (Node 24 LTS recommended).
 
 The homepage works without environment variables as a deployment smoke check. The normal Neon-backed flow requires all three variables and the schema; the embedded test option above supplies a local database and credentials automatically.
 
+## Optional AI question drafting
+
+`GREEN_PT_API_KEY` enables server-side GreenPT drafting when an organiser selects **Generate questionnaire**. If the key is missing, or the provider times out, rejects the request, or returns unusable output, the app still creates the questionnaire and opens its editor with no questions. Use **Add a question** to write multiple-choice or free-text questions yourself. At least one question is required before invitations can be generated. Successful AI drafts open in the same editor for review.
+
+This fallback also works in the embedded test environment, where AI calls are disabled. Select a country and risk, choose **Generate questionnaire**, then add and save your questions manually.
+
 ## Deploy to Vercel + Neon
 
 1. Push this project to GitHub and import the repository into Vercel.

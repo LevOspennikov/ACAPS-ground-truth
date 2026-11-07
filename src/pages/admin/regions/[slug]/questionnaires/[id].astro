@@ -35,6 +35,7 @@ const questionnaire = page?.questionnaire;
         {error === "options" && <p class="notice error" role="alert">Multiple choice needs at least two options, one per line.</p>}
         {error === "question" && <p class="notice error" role="alert">Check the question and try again.</p>}
         {error === "locked" && <p class="notice error" role="alert">This questionnaire has already been sent.</p>}
+        {Astro.url.searchParams.get('manual') === '1' && !questionnaire.sent && !questionnaire.questions.length && <p class="notice" role="status">Automatic question drafting is unavailable. Add your questions below.</p>}
 
         <h2>Questions</h2>
         {!questionnaire.questions.length && <p>No questions yet.</p>}
