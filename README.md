@@ -99,6 +99,14 @@ Questions lock after the first invitation. Admins can later invite additional ma
 
 `db/expert-coverage.sql` creates `expert_countries` and `expert_risks` after the country-risk schema and backfills legacy contacts without replacing existing coverage. Setup and production initialization include it; prototype reset includes both new tables. Use a separate initialized database for local/preview checks. Production data is not changed by an unmerged feature branch.
 
+## Expert group results
+
+After final submission, `/questionnaire` shows thanks and server-aggregated distributions for choice questions, with pie charts, every answer option, counts and percentages. Other experts' written responses and individual response records are excluded. Each percentage uses the submitted answers to that question; drafts never contribute. Results are fetched on the server only when the page loads or the expert selects **Refresh results**. There is no automatic polling or client JavaScript for results.
+
+Set the server-only `EXPERT_RESULTS_MIN_RESPONSES` environment variable to a nonnegative integer (default `0`). Withholding applies separately to each question. Below the threshold, no counts or percentages are sent to the browser. Zero shows available distributions immediately, including small groups; comparing live distributions can reveal a newly arriving answer. Invalid configuration withholds results and reports that configuration needs attention. Redeploy after changing the environment variable.
+
+Viewing results requires an active expert session whose assignment has been submitted. The server derives the questionnaire from the session and renders only aggregate choice results. HTML responses use `Cache-Control: no-store`. Reopening an invitation in the same browser with a matching active session redirects to the questionnaire's saved or submitted state without consuming the invitation again or extending the session. Another browser, cleared cookies or an expired seven-day session requires a fresh invitation. Invitation acceptance remains single-use and requires an explicit POST.
+
 ## Structure
 
 ```text
@@ -118,7 +126,7 @@ src/middleware.js             Privacy and security headers
 
 ## Current scope and next iterations
 
-This is a synthetic-data deployment prototype organized around country risks and their questionnaires. User profiles support named (admin-only identity) and anonymous modes; deactivation preserves answers while blocking access. There are no user deletions. Questionnaire metadata is set at creation, and single-choice/text prompts stay defined in code. Each questionnaire stores an immutable prompt snapshot. Responses contain question-ID-keyed answers and server-side progress, not the old fixed rating columns. Results show single-choice counts over all submissions and the latest 100 unattributed responses. Free text may contain identifying information and must be treated as confidential. There are no expert-facing group results or public attribution options.
+This is a synthetic-data deployment prototype organized around country risks and their questionnaires. User profiles support named (admin-only identity) and anonymous modes; deactivation preserves answers while blocking access. There are no user deletions. Questionnaire metadata is set at creation, and single-choice/text prompts stay defined in code. Each questionnaire stores an immutable prompt snapshot. Responses contain question-ID-keyed answers and server-side progress, not the old fixed rating columns. Admin results show single-choice counts over all submissions and the latest 100 unattributed responses. Free text may contain identifying information and must be treated as confidential. Experts see aggregate choice distributions only after submitting, subject to the configured withholding threshold. There are no public attribution options.
 
 The Neon Vercel integration may provide `STORAGE_DATABASE_URL`; the app and schema setup script accept this as a fallback to `DATABASE_URL`. Keep `ADMIN_PASSWORD` and `SESSION_SECRET` configured separately. If the database is new, sign in to admin and use **Initialize missing tables**, or apply `db/schema.sql` through Neon's SQL Editor. Initialization uses only `CREATE TABLE IF NOT EXISTS` and preserves existing records. Production secrets marked Sensitive cannot be downloaded with `vercel env pull`; configure a separate local development database connection instead.
 

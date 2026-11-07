@@ -5,7 +5,7 @@ export const hash = (value) => createHash('sha256').update(value).digest('hex');
 export const token = () => randomBytes(32).toString('hex');
 export const equal = (a, b) => timingSafeEqual(Buffer.from(hash(a)), Buffer.from(hash(b)));
 const sign = (value) => createHmac('sha256', import.meta.env.SESSION_SECRET).update(value).digest('hex');
-export const cookieOptions = { path: '/', httpOnly: true, sameSite: 'lax', secure: import.meta.env.PROD };
+export const cookieOptions = { path: '/', httpOnly: true, sameSite: 'lax', secure: import.meta.env?.PROD ?? false };
 export function setAdmin(cookies) {
   const expiry = String(Date.now() + 8 * 60 * 60 * 1000);
   cookies.set('admin', `${expiry}.${sign(expiry)}`, { ...cookieOptions, maxAge: 8 * 60 * 60 });
@@ -29,4 +29,18 @@ export async function expertAssignment(cookies) {
     LEFT JOIN crises c ON c.id = q.crisis_id LEFT JOIN regions g ON g.slug = q.region_slug LEFT JOIN responses r ON r.assignment_id = a.id
     WHERE s.token_hash = ${hash(value)} AND s.expires_at > now() AND e.active = true`;
   return assignment || null;
+}
+
+export async function invitationMatchesSession(cookies, invitation, getSql = db) {
+  const session = cookies.get('expert')?.value;
+  if (!session || typeof invitation !== 'string' || !/^[a-f0-9]{64}$/.test(invitation)) return false;
+  const sql = getSql();
+  // The invitation identifies the destination; the existing session grants access.
+  // Neither a consumed/expired link nor this GET creates or extends a session.
+  const [match] = await sql`SELECT 1 FROM expert_sessions s
+    JOIN assignments a ON a.id = s.assignment_id JOIN experts e ON e.id = a.expert_id
+    JOIN invitations i ON i.assignment_id = a.id
+    WHERE s.token_hash = ${hash(session)} AND s.expires_at > now() AND e.active = true
+    AND i.token_hash = ${hash(invitation)}`;
+  return Boolean(match);
 }

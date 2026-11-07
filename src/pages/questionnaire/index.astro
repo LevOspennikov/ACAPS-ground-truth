@@ -5,6 +5,7 @@ import { expertAssignment } from '../../server/auth.js';
 import { saveResponse } from '../../server/responses.js';
 import { sameOrigin, reject } from '../../server/forms.js';
 import { validateAnswer, firstUnanswered, answerLabel } from '../../server/answers.js';
+import ExpertResults from '../../components/ExpertResults.astro';
 
 if (Astro.request.method === 'POST' && !sameOrigin(Astro.request)) return reject('Forbidden', 403);
 let assignment = null;
@@ -60,7 +61,7 @@ const question = questions[step];
     {!assignment ? <><h1>{loadFailed ? 'Your questionnaire is unavailable.' : 'Open your private invitation.'}</h1><p>{loadFailed ? 'We could not reach the server. Retry shortly.' : 'Use your organiser’s link to sign in. If your session expired or access was deactivated, ask for a new link.'}</p><a href="/">Return home</a></> : <>
       <p class="muted">{assignment.crisis_title} · {assignment.country}</p><h1>{assignment.title}</h1><p>{assignment.description}</p>
       <p class="muted">{assignment.profile_mode === 'anonymous' ? 'Anonymous profile: no name or email is stored.' : 'Named profile: your name and email are visible only to admins.'} Answers are never publicly attributed. Avoid identifying details in free text.</p>
-      {assignment.submitted_at ? <section class="notice" role="status"><h2>Thank you. Your response is submitted.</h2><p>Your answers are saved on the server and cannot be edited. A fresh invitation to this assignment will show this completion state.</p></section> : <form method="post" action="/questionnaire">
+      {assignment.submitted_at ? <><section class="notice" role="status"><h2>Thank you. Your response is submitted.</h2><p>Your answers are saved on the server and cannot be edited. Return through your invitation in this browser within seven days to see the latest results, or ask your organiser for a fresh link.</p></section><ExpertResults /></> : <form method="post" action="/questionnaire">
         <input type="hidden" name="current" value={step} />
         {saved && <p class="notice" role="status">Progress saved on the server. Return in this browser within seven days, or ask your organiser for a fresh link to the same questionnaire.</p>}
         {error && <p class="notice error" role="alert">{error}</p>}
