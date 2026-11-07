@@ -12,7 +12,6 @@ import {
   answerLabel
 } from '../../server/answers.js';
 import ExpertResults from '../../components/ExpertResults.astro';
-import ExpertRoundComparison from '../../components/ExpertRoundComparison.astro';
 
 if (Astro.request.method === 'POST' && !sameOrigin(Astro.request)) {
   return reject('Forbidden', 403);
@@ -30,6 +29,8 @@ try {
   Astro.response.status = 503;
 }
 
+if (assignment?.round_two_submitted_at) return Astro.redirect('/questionnaire', 303);
+
 if (!assignment && !loadFailed) {
   Astro.response.status = 401;
 }
@@ -41,9 +42,7 @@ const answers = { ...originalAnswers, ...(assignment?.round_two_answers || {}) }
 
 const total = questions.length;
 
-let step = assignment?.round_two_submitted_at
-  ? total
-  : Math.min(assignment?.round_two_progress_step || 0, total);
+let step = Math.min(assignment?.round_two_progress_step || 0, total);
 
 let error = '';
 
@@ -60,10 +59,6 @@ if (assignment && Astro.request.method === 'POST') {
     !['next', 'back', 'save', 'submit'].includes(intent)
   ) {
     return reject('Invalid questionnaire step.');
-  }
-
-  if (assignment.round_two_submitted_at) {
-    return Astro.redirect('/round-two', 303);
   }
 
   step = current;
@@ -113,14 +108,14 @@ if (assignment && Astro.request.method === 'POST') {
       const latest = await roundTwoAssignment(Astro.cookies);
 
       if (latest?.round_two_submitted_at) {
-        return Astro.redirect('/round-two', 303);
+        return Astro.redirect('/questionnaire', 303);
       }
 
       return reject('Your session ended or access was revoked.', 401);
     }
 
     return Astro.redirect(
-      intent === 'save'
+      intent === 'submit' ? '/questionnaire' : intent === 'save'
         ? '/round-two?saved=1'
         : '/round-two',
       303
@@ -144,8 +139,6 @@ if (assignment && Astro.request.method === 'POST') {
 
 const question = questions[step];
 const saved = Astro.url.searchParams.has('saved');
-const refreshedAt = new Date();
-const formatTime = (value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'UTC' }).format(new Date(value));
 ---
 
 <!doctype html>
@@ -158,7 +151,7 @@ const formatTime = (value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'med
 </head>
 
 <body>
-  <main class:list={['expert-shell', { 'submitted-results': assignment?.round_two_submitted_at }]}>
+  <main class="expert-shell">
 
     {!assignment ? (
       <>
@@ -175,168 +168,132 @@ const formatTime = (value) => new Intl.DateTimeFormat('en-GB', { dateStyle: 'med
 
         <h1>{assignment.title}</h1>
 
-        {!assignment.round_two_submitted_at && <p>
+        <p>
           Review the anonymized group assessment, then reconsider
           your original answers using your own expertise.
-        </p>}
+        </p>
 
-        {assignment.round_two_submitted_at ? (
-          <><section class="notice submission-confirmation" role="status">
-            <p><strong>Round 2 completed.</strong> Your revised answers are saved.</p>
-            <a href="/questionnaire">Back to your questionnaire</a>
-          </section>
-          <div class="results-toolbar"><h2>Your Round 2 results</h2><a href="/round-two">Refresh all results</a></div>
-          <p class="results-explainer">Round 1 is frozen; Round 2 updates with submissions. Group sizes may differ. Values show % (count); pp = percentage points. Written responses stay private.</p>
-          <p class="results-timestamps">Updated <time datetime={refreshedAt.toISOString()}>{formatTime(refreshedAt)} UTC</time> · Round 1 captured {formatTime(assignment.round_two_started_at)} UTC</p>
-          {questions.map((q, index) => <section class="result-card comparison-card" aria-labelledby={`result-${q.id}`}>
-            <p class="question-label">Question {index + 1}</p>
-            <h2 id={`result-${q.id}`}>{q.prompt}</h2>
-            {q.type === 'single' ? <>
-              <p class="own-answer-change"><span class="muted">Your answer</span><span>{answerLabel(q, originalAnswers[q.id])}</span><span aria-hidden="true">→</span><span class="sr-only">to</span><strong>{answerLabel(q, answers[q.id])}</strong><small>{originalAnswers[q.id] === answers[q.id] ? 'Unchanged' : 'Revised'}</small></p>
-              <ExpertRoundComparison question={q} />
-            </> : <div class="written-comparison">
-              <div><h3>Your Round 1 answer</h3><p class="answer-context">{answerLabel(q, originalAnswers[q.id])}</p></div>
-              <div><h3>Your Round 2 answer</h3><p class="answer-context">{answerLabel(q, answers[q.id])}</p></div>
-            </div>}
-          </section>)}
-          </>
-        ) : (
-          <>
-            <form method="post" action="/round-two">
-              <input
-                type="hidden"
-                name="current"
-                value={step}
-              />
+        <form method="post" action="/round-two">
+          <input
+            type="hidden"
+            name="current"
+            value={step}
+          />
 
-              {saved && (
-                <p class="notice" role="status">
-                  Your Round 2 progress was saved on the server.
-                </p>
-              )}
+          {saved && (
+            <p class="notice" role="status">
+              Your Round 2 progress was saved on the server.
+            </p>
+          )}
 
-              {error && (
-                <p class="notice error" role="alert">
-                  {error}
-                </p>
-              )}
+          {error && (
+            <p class="notice error" role="alert">
+              {error}
+            </p>
+          )}
 
-              {question ? (
-                <>
-                  <h2>Reassess your answer</h2>
-                  <p>Your answer is prefilled. Keep it or revise it using your expertise and any feedback below.</p>
+          {question ? (
+            <>
+              <p class="muted">
+                Question {step + 1} of {total}
+              </p>
 
-                  <p class="muted">
-                    Question {step + 1} of {total}
-                  </p>
+              {question.type === 'single' ? (
+                <fieldset class="reassessment-question">
+                  <legend>{question.prompt}</legend>
 
-                  {question.type === 'single' && <ExpertResults questionId={question.id} frozen={true} refreshHref="/round-two" />}
-
-                  <section class="result-card">
-                    <h3>Your Round 1 answer</h3>
-                    <p>
-                      {answerLabel(
-                        question,
-                        originalAnswers[question.id]
-                      )}
-                    </p>
-                  </section>
-
-                  {question.type === 'single' ? (
-                    <fieldset>
-                      <legend>{question.prompt}</legend>
-
-                      {question.options.map((option, i) => (
-                        <label class="choice">
-                          <input
-                            type="radio"
-                            name="answer"
-                            value={`${question.id}-${i}`}
-                            checked={
-                              answers[question.id] ===
-                              `${question.id}-${i}`
-                            }
-                          />
-                          {option}
-                        </label>
-                      ))}
-                    </fieldset>
-                  ) : (
-                    <>
-                      <label for="answer">
-                        {question.prompt}{question.required === false ? ' (optional)' : ''}
-                      </label>
-
-                      <textarea
-                        id="answer"
+                  {question.options.map((option, i) => (
+                    <label class="choice">
+                      <input
+                        type="radio"
                         name="answer"
-                        rows="4"
-                        maxlength="4000"
-                        placeholder={question.placeholder}
-                      >{answers[question.id] || ''}</textarea>
-                    </>
-                  )}
-
-                  <div class="actions">
-                    {step > 0 && (
-                      <button
-                        class="secondary"
-                        name="intent"
-                        value="back"
-                      >
-                        Back
-                      </button>
-                    )}
-
-                    <button
-                      class="secondary"
-                      name="intent"
-                      value="save"
-                    >
-                      Save progress
-                    </button>
-
-                    <button name="intent" value="next">
-                      {step === total - 1 ? 'Review' : 'Next'}
-                    </button>
-                  </div>
-                </>
+                        value={`${question.id}-${i}`}
+                        checked={
+                          answers[question.id] ===
+                          `${question.id}-${i}`
+                        }
+                      />
+                      {option}
+                    </label>
+                  ))}
+                </fieldset>
               ) : (
                 <>
-                  <h2>Review your Round 2 answers</h2>
+                  <label for="answer">
+                    {question.prompt}{question.required === false ? ' (optional)' : ''}
+                  </label>
 
-                  {questions.map((q) => (
-                    <section class="result-card">
-                      <h3>{q.prompt}</h3>
-                      <p>{answerLabel(q, answers[q.id])}</p>
-                    </section>
-                  ))}
-
-                  <p>
-                    Submitting will finalize your Round 2 answers.
-                  </p>
-
-                  <div class="actions">
-                    <button
-                      class="secondary"
-                      name="intent"
-                      value="back"
-                    >
-                      Back
-                    </button>
-
-                    <button
-                      name="intent"
-                      value="submit"
-                    >
-                      Submit Round 2
-                    </button>
-                  </div>
+                  <textarea
+                    id="answer"
+                    name="answer"
+                    rows="4"
+                    maxlength="4000"
+                    placeholder={question.placeholder}
+                  >{answers[question.id] || ''}</textarea>
                 </>
               )}
-            </form>
-          </>
-        )}
+
+              <p class="answer-context"><strong>Your Round 1 answer:</strong> {answerLabel(question, originalAnswers[question.id])}</p>
+              {question.type === 'single' && <ExpertResults questionId={question.id} frozen={true} showMajority={true} refreshHref="/round-two" />}
+
+              <div class="actions">
+                {step > 0 && (
+                  <button
+                    class="secondary"
+                    name="intent"
+                    value="back"
+                  >
+                    Back
+                  </button>
+                )}
+
+                <button
+                  class="secondary"
+                  name="intent"
+                  value="save"
+                >
+                  Save progress
+                </button>
+
+                <button name="intent" value="next">
+                  {step === total - 1 ? 'Review' : 'Next'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>Review your Round 2 answers</h2>
+
+              {questions.map((q) => (
+                <section class="result-card">
+                  <h3>{q.prompt}</h3>
+                  <p>{answerLabel(q, answers[q.id])}</p>
+                </section>
+              ))}
+
+              <p>
+                Submitting will finalize your Round 2 answers.
+              </p>
+
+              <div class="actions">
+                <button
+                  class="secondary"
+                  name="intent"
+                  value="back"
+                >
+                  Back
+                </button>
+
+                <button
+                  name="intent"
+                  value="submit"
+                >
+                  Submit Round 2
+                </button>
+              </div>
+            </>
+          )}
+        </form>
       </>
     )}
   </main>

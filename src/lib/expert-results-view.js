@@ -2,6 +2,18 @@ import { pieSegments, chartColor } from '../server/charts.js';
 
 const escape = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
 
+export function majoritySummary(question) {
+  if (!question || question.withheld || !question.total) return null;
+  const highest = Math.max(...question.options.map((option) => option.count));
+  const leaders = question.options.filter((option) => option.count === highest);
+  if (leaders.length !== 1) return 'Responses are tied. No option has a majority.';
+  const leader = leaders[0];
+  const summary = `${leader.label} (${leader.count} of ${question.total}, ${leader.percent}%).`;
+  return leader.count > question.total / 2
+    ? `Majority: ${summary}`
+    : `Most common: ${summary} No option has a majority.`;
+}
+
 // Server-rendered result cards. Every text value is escaped before HTML insertion.
 export function resultsMarkup(questions, { withheldMessage = 'Results will appear once enough experts have responded.' } = {}) {
   if (!questions.length) return '<p>There are no choice questions to summarise. Written responses stay private.</p>';

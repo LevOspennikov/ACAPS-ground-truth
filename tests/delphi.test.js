@@ -91,6 +91,7 @@ test('Delphi opening, frozen feedback, authorization, progress and submission lo
       assert.equal(await saveRoundTwoResponse(session, peer.id, {}, 0, false, getSql), false);
       assert.deepEqual((await roundTwoAssignment(session, getSql)).round_two_answers, peer.answers);
       assert.deepEqual((await expertAssignment(session, getSql)).answers, peer.answers);
+      assert.deepEqual((await expertAssignment(session, getSql)).round_two_answers, peer.answers);
       report = await questionnaireResults(peer.questionnaire_id, getSql);
       assert.deepEqual(report.roundTwo, { eligible: 9, drafts: 0, submitted: 1 });
     });
