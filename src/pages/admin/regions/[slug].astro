@@ -3,6 +3,7 @@ import Layout from "../../../layouts/Layout.astro";
 import AdminAccess from "../../../components/AdminAccess.astro";
 import RiskQuestionnaires from "../../../components/RiskQuestionnaires.astro";
 import Participation from "../../../components/Participation.astro";
+import { contactHref } from "../../../server/forms.js";
 import { configured } from "../../../server/db.js";
 import { isAdmin } from "../../../server/auth.js";
 import { regionBoard } from "../../../server/regions.js";
@@ -38,7 +39,7 @@ if (authenticated && !loadError && !region) return new Response("Country not fou
         <ul class="contacts">
           {region.contacts.map((contact) => (
             <li class="contact-row">
-              <a href={`/admin/regions/${region.slug}/contacts/${contact.id}`}>{contact.name}</a>
+              <span><a href={`/admin/regions/${region.slug}/contacts/${contact.id}`}>{contact.name}</a>{contact.contact && <> · <a href={contactHref(contact.contact)}>{contact.contact}</a></>}</span>
               <Participation joined={contact.joined} invited={contact.invited} />
             </li>
           ))}
@@ -48,8 +49,8 @@ if (authenticated && !loadError && !region) return new Response("Country not fou
           <input type="hidden" name="region" value={region.slug} />
           <label for="contact-name">Name</label>
           <input id="contact-name" name="name" required maxlength="120" />
-          <label for="focus">Focus</label>
-          <input id="focus" name="focus" maxlength="120" />
+          <label for="contact">Contact</label>
+          <input id="contact" name="contact" type="text" required maxlength="120" autocomplete="off" placeholder="Email or phone number" />
           <div class="actions"><button>Add contact</button></div>
         </form>
       </section>
