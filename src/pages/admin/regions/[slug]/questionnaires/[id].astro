@@ -40,18 +40,42 @@ const questionnaire = page?.questionnaire;
         {!questionnaire.questions.length && <p>No questions yet.</p>}
         {questionnaire.questions.map((question, index) => (
           <article class="card">
-            <h3>{index + 1}. {question.prompt}</h3>
-            <p class="muted">{question.type === "single" ? "Multiple choice" : "Free text"}</p>
-            {question.type === "single" && <ul>{question.options.map((option) => <li>{option}</li>)}</ul>}
-            {question.type === "text" && <p>{question.placeholder || "Free text."}</p>}
-            {!questionnaire.sent && (
-              <form method="post" action="/api/admin/questionnaire-editor">
-                <input type="hidden" name="region" value={region.slug} />
-                <input type="hidden" name="questionnaire" value={questionnaire.id} />
-                <input type="hidden" name="question" value={question.id} />
-                <input type="hidden" name="action" value="remove" />
-                <button class="secondary" type="submit">Remove</button>
-              </form>
+            <h3>Question {index + 1}</h3>
+            {questionnaire.sent ? (
+              <>
+                <p>{question.prompt}</p>
+                <p class="muted">{question.type === "single" ? "Multiple choice" : "Free text"}</p>
+                {question.type === "single" && <ul>{(question.options || []).map((option) => <li>{option}</li>)}</ul>}
+                {question.type === "text" && <p>{question.placeholder || "Free text."}</p>}
+              </>
+            ) : (
+              <>
+                <form method="post" action="/api/admin/questionnaire-editor">
+                  <input type="hidden" name="region" value={region.slug} />
+                  <input type="hidden" name="questionnaire" value={questionnaire.id} />
+                  <input type="hidden" name="question" value={question.id} />
+                  <input type="hidden" name="action" value="update" />
+                  <label for={`prompt-${question.id}`}>Question</label>
+                  <input id={`prompt-${question.id}`} name="prompt" value={question.prompt} required maxlength="300" />
+                  <label for={`type-${question.id}`}>Type</label>
+                  <select id={`type-${question.id}`} name="type" required>
+                    <option value="single" selected={question.type === "single"}>Multiple choice</option>
+                    <option value="text" selected={question.type === "text"}>Free text</option>
+                  </select>
+                  <label for={`options-${question.id}`}>Answers, one per line</label>
+                  <textarea id={`options-${question.id}`} name="options" maxlength="2000">{(question.options || []).join("\n")}</textarea>
+                  <label for={`placeholder-${question.id}`}>Free text hint</label>
+                  <input id={`placeholder-${question.id}`} name="placeholder" value={question.placeholder || ""} maxlength="180" />
+                  <div class="actions"><button type="submit">Save question</button></div>
+                </form>
+                <form method="post" action="/api/admin/questionnaire-editor">
+                  <input type="hidden" name="region" value={region.slug} />
+                  <input type="hidden" name="questionnaire" value={questionnaire.id} />
+                  <input type="hidden" name="question" value={question.id} />
+                  <input type="hidden" name="action" value="remove" />
+                  <button class="secondary" type="submit">Remove</button>
+                </form>
+              </>
             )}
           </article>
         ))}

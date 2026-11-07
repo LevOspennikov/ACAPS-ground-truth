@@ -1,5 +1,5 @@
 import { redirect, textField } from "../../../server/forms.js";
-import { addQuestion, removeQuestion } from "../../../server/regions.js";
+import { addQuestion, removeQuestion, updateQuestion } from "../../../server/regions.js";
 import { denyUnlessAdmin } from "../../../server/auth.js";
 
 const types = ["single", "text"];
@@ -32,12 +32,14 @@ export async function POST({ request, cookies }) {
     return back(region, questionnaire);
   }
 
-  if (action !== "add") return redirect("/admin");
+  if (action !== "add" && action !== "update") return redirect("/admin");
   let prompt;
   let type;
   let optionsText;
   let placeholder;
+  let questionId = "";
   try {
+    if (action === "update") questionId = textField(form, "question", 80, true);
     prompt = textField(form, "prompt", 300, true);
     type = textField(form, "type", 20, true);
     optionsText = textField(form, "options", 2000, false);
@@ -53,6 +55,9 @@ export async function POST({ request, cookies }) {
     question.options = options;
   }
   if (type === "text") question.placeholder = placeholder;
-  if (!await addQuestion(region, questionnaire, question)) return back(region, questionnaire, "locked");
+  const saved = action === "update"
+    ? await updateQuestion(region, questionnaire, questionId, question)
+    : await addQuestion(region, questionnaire, question);
+  if (!saved) return back(region, questionnaire, "locked");
   return back(region, questionnaire);
 }
