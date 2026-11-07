@@ -2,6 +2,7 @@
 import Layout from "../../../../../layouts/Layout.astro";
 import AdminAccess from "../../../../../components/AdminAccess.astro";
 import Participation from "../../../../../components/Participation.astro";
+import { contactHref } from "../../../../../server/forms.js";
 import { configured } from "../../../../../server/db.js";
 import { isAdmin } from "../../../../../server/auth.js";
 import { contactPage } from "../../../../../server/regions.js";
@@ -24,7 +25,8 @@ if (authenticated && !loadError && !contact) return new Response("Contact not fo
         <p><a href={`/admin/regions/${contact.region.slug}`}>Back to {contact.region.name}</a></p>
         <h1>{contact.name}</h1>
         <p><Participation joined={contact.joined} invited={contact.invited} /></p>
-        <p class="muted">{contact.focus ? `${contact.focus} · ` : ""}{contact.region.name}</p>
+        <p class="muted">{contact.region.name}</p>
+        {contact.contact && <p><a href={contactHref(contact.contact)}>{contact.contact}</a></p>}
         <h2>Past answers</h2>
         {!contact.answers.length && <p>No past answers.</p>}
         {contact.answers.map((item) => (

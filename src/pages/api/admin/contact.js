@@ -1,4 +1,4 @@
-import { redirect, reject, textField } from "../../../server/forms.js";
+import { contactField, redirect, reject, textField } from "../../../server/forms.js";
 import { createContact } from "../../../server/regions.js";
 import { denyUnlessAdmin } from "../../../server/auth.js";
 
@@ -8,15 +8,16 @@ export async function POST({ request, cookies }) {
   const form = await request.formData();
   let region;
   let name;
-  let focus;
+  let contact;
   try {
     region = textField(form, "region", 80, true);
     name = textField(form, "name", 120, true);
-    focus = textField(form, "focus", 120, false);
-  } catch {
-    return reject("A contact name of up to 120 characters is required.");
+    contact = contactField(form);
+  } catch (error) {
+    const message = error.message === "Enter an email address or a phone number." ? error.message : "A contact name of up to 120 characters is required.";
+    return reject(message);
   }
-  const id = await createContact(region, name, focus);
+  const id = await createContact(region, name, contact);
   if (!id) return reject("Country not found", 404);
   return redirect(`/admin/regions/${region}/contacts/${id}`);
 }

@@ -67,7 +67,7 @@ export async function regionBoard(slug, riskId = "", { includeContacts = false }
     ...region,
     risks, selectedRisk,
     questionnaires: questionnaires.map((item) => ({ id: item.id, topic: item.title, opened: formatDate(item.created_at), sent: item.sent_at ? formatDate(item.sent_at) : "" })),
-    contacts,
+    contacts: contacts.map((item) => ({ ...item, contact: item.focus || "" })),
   };
 }
 
@@ -90,12 +90,15 @@ export async function reportPage(slug, id) {
   return { id: row.id, title: row.title, summary: row.summary, date: formatDate(row.published_on), region: { slug: row.slug, name: row.name } };
 }
 
-export async function createContact(slug, name, focus) {
+export async function createContact(slug, name, contact) {
   const sql = db();
   const [region] = await sql`SELECT slug FROM regions WHERE slug = ${slug}`;
   if (!region) return null;
   const id = randomUUID();
-  await sql.transaction([sql`INSERT INTO experts (id, pseudonym, region_slug, focus) VALUES (${id}, ${name}, ${slug}, ${focus})`, sql`INSERT INTO expert_countries (expert_id, region_slug) VALUES (${id}, ${slug})`]);
+  await sql.transaction([
+    sql`INSERT INTO experts (id, pseudonym, region_slug, focus) VALUES (${id}, ${name}, ${slug}, ${contact})`,
+    sql`INSERT INTO expert_countries (expert_id, region_slug) VALUES (${id}, ${slug})`,
+  ]);
   return id;
 }
 
@@ -123,7 +126,7 @@ export async function contactPage(slug, id) {
   return {
     id: contact.id,
     name: contact.name,
-    focus: contact.focus,
+    contact: contact.focus || "",
     invited: contact.invited,
     joined: contact.joined,
     region: { slug: contact.slug, name: contact.region_name },
