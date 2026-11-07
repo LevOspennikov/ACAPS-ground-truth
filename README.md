@@ -22,6 +22,8 @@ The mobile-friendly interface uses short, focused forms and works with JavaScrip
 
 The application supports named profiles, whose names and email addresses are visible only to administrators, and anonymous profiles that store neither. Private invitation links expire after 48 hours and can be redeemed once to establish an assignment-specific session. Expert-facing group results contain aggregate choice answers, with a configurable minimum-response threshold for each question.
 
+Anonymity is deliberately managed through the organiser as part of onboarding a small, trusted expert panel. The expert chooses their preferred mode in conversation with the organiser, who explains the implications and applies the setting. This gives experts a human point of contact for privacy questions and keeps responsibility for handling identity data with the organiser. The questionnaire displays the active mode and explains whether a name and email are stored before the expert answers. Experts can request a change through the organiser at any time; the organiser is responsible for applying the expert's choice. Anonymous profile mode does not make an expert unknown to an organiser who already knows them, and written answers may still contain identifying details.
+
 <img width="461" height="753" alt="Screenshot 2026-11-07 at 17 19 52" src="https://github.com/user-attachments/assets/aba9a3b3-226d-4b43-8821-623e7c2032e1" />
 
 ## A practical foundation
