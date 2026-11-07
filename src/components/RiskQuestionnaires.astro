@@ -1,12 +1,14 @@
 ---
-import { riskRadarFields, riskRadarSummaryKeys } from "../data/risk-radar-fields.js";
+import { riskRadarFields } from "../data/risk-radar-fields.js";
 
 const { region, links = "country" } = Astro.props;
+const compact = links !== "overview";
 const risk = region.selectedRisk;
 const current = region.questionnaires.filter((item) => !item.sent);
 const sent = region.questionnaires.filter((item) => item.sent);
-const summaryFields = riskRadarSummaryKeys.filter((key) => key !== "country").map((key) => riskRadarFields.find((field) => field.key === key));
-const additionalFields = riskRadarFields.filter((field) => !riskRadarSummaryKeys.includes(field.key));
+const primaryRiskKeys = ["risk_type", "status", "probability", "risk_level", "risk_trend", "intensity_of_hazard", "impact"];
+const primaryFields = primaryRiskKeys.map((key) => riskRadarFields.find((field) => field.key === key));
+const additionalFields = riskRadarFields.filter((field) => !["risk_id", "risk_title", "country", "iso", ...primaryRiskKeys].includes(field.key));
 const generateError = Astro.url.searchParams.get("error");
 const riskHref = (riskId) => links === "overview"
   ? `/admin?${new URLSearchParams({ country: region.slug, risk: riskId })}`
@@ -16,11 +18,13 @@ const riskHref = (riskId) => links === "overview"
 <section aria-labelledby="risk-heading">
   <h2 id="risk-heading">Risks in {region.name}</h2>
   {region.risks.length ? (
-    <nav class="region-grid" aria-label="Risks">
-      {region.risks.map((item) => (
-        <a class="region-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined}>{item.risk_id} · {item.risk_title}</a>
-      ))}
-    </nav>
+    {compact ? <nav class="risk-list" aria-label={`Risks in ${region.name}`}>
+      <ul>{region.risks.map((item) => (
+        <li><a class="risk-list-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined}><span class="risk-list-id">{item.risk_id}</span><span>{item.risk_title}</span><span class="risk-list-arrow" aria-hidden="true">→</span></a></li>
+      ))}</ul>
+    </nav> : <nav class="region-grid" aria-label="Risks">
+      {region.risks.map((item) => <a class="region-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined}>{item.risk_id} · {item.risk_title}</a>)}
+    </nav>}
   ) : <p class="notice">No risks for this country yet. Add one below.</p>}
   <details class="card" id="add-risk">
     <summary>Add another risk in {region.name}</summary>
@@ -54,25 +58,37 @@ const riskHref = (riskId) => links === "overview"
     <>
       <p class="eyebrow">{risk.risk_id} · {region.name}</p>
       <h2 id="risk-detail-heading">{risk.risk_title}</h2>
-      <dl class="risk-fields">
-        {riskRadarFields.filter((field) => field.key !== "risk_id" && field.key !== "risk_title").map((field) => (
+      {compact ? <dl class="risk-fields risk-fields-primary">
+        {primaryFields.filter((field) => risk[field.key]).map((field) => (
           <div>
             <dt>{field.label}</dt>
             <dd class="answer-context">{risk[field.key] || "—"}</dd>
           </div>
         ))}
-      </dl>
+      </dl> : <dl class="risk-fields">
+        {riskRadarFields.filter((field) => field.key !== "risk_id" && field.key !== "risk_title").map((field) => <div><dt>{field.label}</dt><dd class="answer-context">{risk[field.key] || "—"}</dd></div>)}
+      </dl>}
+      {compact && <details class="more-risk-details">
+        <summary>More risk details</summary>
+        <dl class="risk-fields">
+          {additionalFields.map((field) => (
+            <div>
+              <dt>{field.label}</dt>
+              <dd class="answer-context">{risk[field.key] || "—"}</dd>
+            </div>
+          ))}
+        </dl>
+      </details>}
       <p><a class="button" href={`/admin/regions/${region.slug}/answers?risk=${encodeURIComponent(risk.risk_id)}`}>All answers for this risk</a></p>
-      <h3>In progress</h3>
-      {!current.length && <p>No draft questionnaires for this risk.</p>}
-      <ul>
-        {current.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · opened {item.opened}</li>)}
+      {compact ? <><h3>Questionnaires</h3>
+      {!current.length && !sent.length && <p>No questionnaires for this risk yet.</p>}
+      <ul class="questionnaire-list">
+        {[...current, ...sent].map((item) => <li class="questionnaire-row">
+          <div class="questionnaire-row-main"><span class={`questionnaire-status ${item.sent ? "is-sent" : "is-draft"}`}>{item.sent ? "Sent" : "Draft"}</span><a class="questionnaire-topic" href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a><span class="muted questionnaire-date">{item.sent ? `Sent ${item.sent}` : `Opened ${item.opened}`}</span></div>
+          <a class="questionnaire-action" href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.sent ? "Manage invitations" : "Continue draft"}<span aria-hidden="true"> →</span></a>
+        </li>)}
       </ul>
-      <h3>Sent</h3>
-      {!sent.length && <p>No sent questionnaires for this risk.</p>}
-      <ul>
-        {sent.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent}</li>)}
-      </ul>
+      </> : <><h3>In progress</h3>{!current.length && <p>No draft questionnaires for this risk.</p>}<ul>{current.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · opened {item.opened}</li>)}</ul><h3>Sent</h3>{!sent.length && <p>No sent questionnaires for this risk.</p>}<ul>{sent.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent}</li>)}</ul></>}
       <form method="post" action="/api/admin/region-questionnaire" data-astro-reload>
         <h3>New questionnaire</h3>
         {generateError === "key" && <p class="notice error" role="alert">Set GREEN_PT_API_KEY on the server, then generate again.</p>}
