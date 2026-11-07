@@ -86,9 +86,10 @@ const riskHref = (riskId) => links === "overview"
         {[...current, ...sent].map((item) => <li class="questionnaire-row">
           <div class="questionnaire-row-main"><span class={`questionnaire-status ${item.sent ? "is-sent" : "is-draft"}`}>{item.sent ? "Sent" : "Draft"}</span><a class="questionnaire-topic" href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a><span class="muted questionnaire-date">{item.sent ? `Sent ${item.sent}` : `Opened ${item.opened}`}</span></div>
           <a class="questionnaire-action" href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.sent ? "Manage invitations" : "Continue draft"}<span aria-hidden="true"> →</span></a>
+          <a href={`/admin/results/${item.id}`}>Results and rounds</a>
         </li>)}
       </ul>
-      </> : <><h3>In progress</h3>{!current.length && <p>No draft questionnaires for this risk.</p>}<ul>{current.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · opened {item.opened}</li>)}</ul><h3>Sent</h3>{!sent.length && <p>No sent questionnaires for this risk.</p>}<ul>{sent.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent}</li>)}</ul></>}
+      </> : <><h3>In progress</h3>{!current.length && <p>No draft questionnaires for this risk.</p>}<ul>{current.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · opened {item.opened} · <a href={`/admin/results/${item.id}`}>Results and rounds</a></li>)}</ul><h3>Sent</h3>{!sent.length && <p>No sent questionnaires for this risk.</p>}<ul>{sent.map((item) => <li><a href={`/admin/regions/${region.slug}/questionnaires/${item.id}`}>{item.topic}</a> · sent {item.sent} · <a href={`/admin/results/${item.id}`}>Results and rounds</a></li>)}</ul></>}
       <form method="post" action="/api/admin/region-questionnaire" data-astro-reload>
         <h3>New questionnaire</h3>
         {generateError === "key" && <p class="notice error" role="alert">Set GREEN_PT_API_KEY on the server, then generate again.</p>}

@@ -207,18 +207,17 @@ const question = questions[step];
             <section class="notice" role="status">
               <h2>Thank you. Your response is submitted.</h2>
 
-              <p>
+              {assignment.round_two_started_at ? <p>Your Round 1 answers are saved and locked. {assignment.round_two_submitted_at ? 'Your Round 2 submission is available below.' : 'Use the link below to continue your reassessment.'}</p> : <p>
                 Your answers are saved on the server and cannot
                 be edited. Return through your invitation in
                 this browser within seven days to see the latest
                 results, or ask your organiser for a fresh link.
-              </p>
+              </p>}
             </section>
 
-            <ExpertResults />
+            {!assignment.round_two_started_at && <ExpertResults />}
 
-            <!-- NEW: ROUND 2 NAVIGATION -->
-            <section class="result-card">
+            {assignment.round_two_started_at && <section class="result-card">
               <h2>Round 2 — Reassessment</h2>
 
               <p>
@@ -241,10 +240,10 @@ const question = questions[step];
                   href="/round-two"
                   class="round-two-link"
                 >
-                  Continue to Round 2 →
+                  {assignment.round_two_submitted_at ? 'View your Round 2 results →' : 'Continue to Round 2 →'}
                 </a>
               </div>
-            </section>
+            </section>}
 
           </>
         ) : (

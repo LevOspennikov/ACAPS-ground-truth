@@ -17,12 +17,12 @@ Build a lightweight, mobile-friendly platform where trusted humanitarian experts
 ## Current product flow
 **Organiser/admin:** Sign in, select a country and risk, generate and review a questionnaire, edit single-choice or free-text questions, select experts with matching country/risk coverage, and generate invitation links. Questions lock after the first invitation. Review completion counts, submitted context, and answer distributions.
 
-**Expert:** Open an emailed or manually shared invitation, explicitly accept it, answer one question at a time, save progress on the server, review, and submit. Submission is final. A valid session resumes the assigned questionnaire and permits aggregate choice results only after submission.
+**Expert:** Open an emailed or manually shared invitation, explicitly accept it, answer one question at a time, save progress on the server, review, and submit. Submission is final. A valid session resumes the assigned questionnaire and permits aggregate choice results only after submission. During optional Round 2, show frozen Round 1 feedback for the current question. After Round 2 submission, show all questions and updated Round 2 aggregates on one scrollable page with one whole-page refresh control.
 
-Profiles currently support admin-managed named and anonymous modes. Country/risk coverage determines eligibility for new assignments. Expert-controlled privacy preferences, dedicated panels, iterative consultation rounds, and forecast scoring remain development goals; distinguish them from existing behaviour.
+Profiles currently support admin-managed named and anonymous modes. Country/risk coverage determines eligibility for new assignments. An optional organiser-started Round 2 preserves original answers and uses frozen, question-specific choice feedback. Without an explicit start, the expert flow remains single-round. Expert-controlled privacy preferences, dedicated panels, additional consultation rounds, and forecast scoring remain development goals; distinguish them from existing behaviour.
 
 ## Data model
-- Main entities: `experts`, `regions`, `risk_radar`, `expert_countries`, `expert_risks`, `questionnaires`, `assignments`, `invitations`, `expert_sessions`, and `responses`.
+- Main entities: `experts`, `regions`, `risk_radar`, `expert_countries`, `expert_risks`, `questionnaires`, `assignments`, `invitations`, `expert_sessions`, `responses`, and `round_two_responses`. Questionnaires store Round 2 opening time and a frozen aggregate choice-feedback snapshot.
 - Questionnaires link to countries and risks and store question snapshots as JSON. Responses store question-ID-keyed answers and progress. Plan migrations when changing existing storage.
 - The catalog seed contains 12 risks across five countries, including Chad R1043. Runtime seed records live in `db/seeds/`; the synthetic questionnaire/response demo in `src/data/demo.js` currently targets Afghanistan R0353.
 - Preserve source exports and existing challenge material. Use synthetic expert profiles and responses for the hackathon.

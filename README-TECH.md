@@ -161,6 +161,23 @@ Set the server-only `EXPERT_RESULTS_MIN_RESPONSES` environment variable to a non
 
 Viewing results requires an active expert session whose assignment has been submitted. The server derives the questionnaire from the session and renders only aggregate choice results. HTML responses use `Cache-Control: no-store`. Reopening an invitation in the same browser with a matching active session redirects to the questionnaire's saved or submitted state without consuming the invitation again or extending the session. Another browser, cleared cookies or an expired seven-day session requires a fresh invitation. Invitation acceptance remains single-use and requires an explicit POST.
 
+## Optional Delphi reassessment
+
+Questionnaires stay single-round until an organiser explicitly opens Round 2. Experts answer, save, submit, and see the original group results as before. No Round 2 link or reassessment access is available before that start.
+
+To open reassessment:
+
+1. From the country/risk overview, the questionnaire editor, or **All answers for this risk**, open **Results and rounds**.
+2. Collect at least one submitted response, then select **Start Round 2** when the panel is ready. This locks the questions and captures the submitted Round 1 choice distributions in one database statement. Repeated starts preserve the initial snapshot. The minimum expert-results threshold still applies separately to each question; starting with a small group may leave feedback withheld throughout reassessment.
+3. Experts return through their existing invitation/session to `/questionnaire`. After their own Round 1 submission, this page now offers **Continue to Round 2** (or **View your Round 2 results** after submitting). No separate invitation or password is required. An expired session still requires a fresh link to the same assignment.
+4. During reassessment, `/round-two` shows the original answer and frozen Round 1 feedback for the current choice question only. Text questions and the review screen show no group distributions. Original answers are preselected for convenience; changes are saved separately. Refreshing results stays on the current Round 2 step.
+5. After submitting Round 2, experts see all questions on one scrollable results page. Each compact card shows their answer change and a shared table of Round 1/2 percentages, response counts and percentage-point changes, with small bars for comparison. Timestamps and explanations appear once above the cards. A single **Refresh all results** link reloads the whole page and updates every revised distribution; there are no individual question refresh controls. Only submitted Round 2 answers contribute, the expert-results minimum threshold applies per question, and drafts or other experts' written responses are never exposed. An expert who has not submitted Round 2 cannot access its live group results.
+6. The admin results page tracks Round 2 submitted/in-progress/not-started counts among Round 1 submitters and compares experts who submitted both rounds. Comparisons are withheld below five valid pairs per question. Movement counts exclude “Cannot assess” pairs and show their own denominator. Answer changes describe revisions, not a measure of convergence.
+
+Pending experts can still complete Round 1 after reassessment starts and then join Round 2. Their late answers do not alter the frozen feedback. Admin Round 1 reports continue to include all submitted answers; the paired comparison uses only completed pairs. There is currently no automatic email on round opening, closing/reopening control, or additional round beyond Round 2.
+
+The additive migration at the end of `db/schema.sql` adds `questionnaires.round_two_started_at` and `round_one_feedback`; existing answers, assignments, invitations and sessions are preserved. Production initialization applies it automatically; for local Neon or preview databases run the normal `npm run db:setup` with that database's `.env`, or apply `db/schema.sql` explicitly. `npm run dev:test` applies it on startup. If an existing questionnaire already has Round 2 drafts/submissions from the earlier prototype, migration keeps it open and captures current feedback once at migration time; historical feedback was not stored and cannot be reconstructed. A fresh database/demo remains single-round until you select **Start Round 2**.
+
 ## Structure
 
 ```text
