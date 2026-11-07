@@ -92,7 +92,7 @@ export function parseGeneratedQuestions(content) {
   return questions;
 }
 
-export async function generateRiskQuestions(risk) {
+async function requestRiskQuestions(risk) {
   const key = getGreenPtApiKey();
   if (!key) throw new Error('key');
   let response;
@@ -121,4 +121,11 @@ export async function generateRiskQuestions(risk) {
   const body = await response.json();
   const message = body?.choices?.[0]?.message || {};
   return parseGeneratedQuestions(message.content || message.reasoning_content);
+}
+
+// AI drafting is optional. Missing configuration, provider errors and invalid
+// output leave an empty questionnaire for the organiser to write manually.
+export async function generateRiskQuestions(risk) {
+  try { return await requestRiskQuestions(risk); }
+  catch { return []; }
 }

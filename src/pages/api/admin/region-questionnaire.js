@@ -20,14 +20,8 @@ export async function POST({ request, cookies }) {
   const risk = await countryRisk(region, riskId);
   if (!risk) return reject("Risk not found in the selected country", 404);
   const back = `/admin/regions/${region}?${new URLSearchParams({ risk: riskId, error: "generate" })}`;
-  let questions;
-  try {
-    questions = await generateRiskQuestions(risk);
-  } catch (error) {
-    const code = error.message === "key" ? "key" : "generate";
-    return redirect(`/admin/regions/${region}?${new URLSearchParams({ risk: riskId, error: code })}`);
-  }
+  const questions = await generateRiskQuestions(risk);
   const id = await createQuestionnaire(region, String(risk.risk_title).slice(0, 180), riskId, questions);
   if (!id) return redirect(back);
-  return redirect(`/admin/regions/${region}/questionnaires/${id}`);
+  return redirect(`/admin/regions/${region}/questionnaires/${id}${questions.length ? '' : '?manual=1'}`);
 }
