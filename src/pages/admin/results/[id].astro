@@ -1,24 +1,303 @@
+
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
+
 import { configured } from '../../../server/db.js';
 import { isAdmin } from '../../../server/auth.js';
 import { validId } from '../../../server/management.js';
+
 import { questionnaireResults } from '../../../server/results.js';
+import { loadRoundComparison } from '../../../server/round-comparison.js';
+
 import { answerLabel } from '../../../server/answers.js';
 import { pieSegments } from '../../../server/charts.js';
-if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
-let result = null; let failed = false;
-if (validId(Astro.params.id)) { try { result = await questionnaireResults(Astro.params.id); } catch { failed = true; } }
-if (!result) Astro.response.status = failed ? 503 : 404;
+
+import RoundComparisonChart from '../../../components/RoundComparisonChart.astro';
+
+// Only administrators can access these results.
+if (!configured() || !isAdmin(Astro.cookies)) {
+  return Astro.redirect('/admin');
+}
+
+let result = null;
+let failed = false;
+
+let comparisons = [];
+let comparisonFailed = false;
+
+if (validId(Astro.params.id)) {
+  try {
+    result = await questionnaireResults(Astro.params.id);
+  } catch {
+    failed = true;
+  }
+}
+
+// Keep the original results available even if
+// the Round 2 database is not ready yet.
+if (result) {
+  try {
+    const comparisonResult = await loadRoundComparison(
+      Astro.params.id
+    );
+
+    comparisons = comparisonResult?.comparisons ?? [];
+  } catch {
+    comparisonFailed = true;
+  }
+}
+
+if (!result) {
+  Astro.response.status = failed ? 503 : 404;
+}
 ---
+
 <AdminLayout title="Questionnaire results">
-  {!result ? <><h1>{failed ? 'Results unavailable' : 'Questionnaire not found'}</h1><p>Return to the country risk overview and retry shortly.</p><a href="/admin">Back to country risks</a></> : <>
-    <a href={result.questionnaire.region_slug ? `/admin/regions/${result.questionnaire.region_slug}` : "/admin"}>← {result.questionnaire.crisis_title}</a><p class="eyebrow">ADMIN ONLY · UNATTRIBUTED RESULTS</p><h1>{result.questionnaire.title}</h1><p class="intro">{result.questionnaire.context}</p>
-    <section class="card"><h2>Completion</h2><p class="stat">{result.summary.submitted} / {result.summary.assigned}</p><p>submitted · {result.summary.drafts} in progress · {result.summary.assigned - result.summary.submitted - result.summary.drafts} not started</p><p class="muted">Reload for the latest results. Draft contents stay private.</p></section>
-    {result.questionnaire.questions.filter((q) => q.type === 'single').map((q) => { const chart = pieSegments(q, result.distributions); return <section class="card"><h2>{q.prompt}</h2>{!chart.total && <p class="muted">No responses yet.</p>}{chart.total > 0 && <div class="donut"><svg viewBox={`0 0 ${chart.size} ${chart.size}`} role="img" aria-label={chart.segments.map((s) => `${s.label}: ${s.count} (${s.percent}%)`).join(', ')}>{chart.segments.map((s) => <circle cx={chart.center} cy={chart.center} r={chart.radius} fill="none" stroke={s.color} stroke-width={chart.width} stroke-dasharray={s.dasharray} stroke-dashoffset={s.dashoffset} transform={`rotate(-90 ${chart.center} ${chart.center})`} />)}</svg><dl class="legend">{chart.segments.map((s) => <div class="row"><dt><span class={`swatch ${s.colorClass}`}></span>{s.label}</dt><dd>{s.count} · {s.percent}%</dd></div>)}</dl></div>}</section>; })}
-    <h2>Submitted answers</h2><p class="muted">Names, pseudonyms and user identifiers are omitted. Treat free text as confidential because it may contain identifying details.</p>
-    {!result.summary.submitted && <p class="notice">No submitted answers yet.</p>}
-    {result.summary.submitted > 100 && <p class="notice">Showing the latest 100 submissions. Choice counts include all submissions.</p>}
-    {result.responses.map((response) => <article class="card"><h3>Submitted response</h3>{result.questionnaire.questions.map((q) => <><h4>{q.prompt}</h4><p class="answer-context">{answerLabel(q, response.answers[q.id])}</p></>)}</article>)}
-  </>}
+
+  {!result ? (
+    <>
+      <h1>
+        {failed
+          ? 'Results unavailable'
+          : 'Questionnaire not found'}
+      </h1>
+
+      <p>
+        Return to the country risk overview and
+        retry shortly.
+      </p>
+
+      <a href="/admin">Back to country risks</a>
+    </>
+  ) : (
+    <>
+
+      <a
+        href={
+          result.questionnaire.region_slug
+            ? `/admin/regions/${result.questionnaire.region_slug}`
+            : '/admin'
+        }
+      >
+        ← {result.questionnaire.crisis_title}
+      </a>
+
+      <p class="eyebrow">
+        ADMIN ONLY · UNATTRIBUTED RESULTS
+      </p>
+
+      <h1>{result.questionnaire.title}</h1>
+
+      <p class="intro">
+        {result.questionnaire.context}
+      </p>
+
+      <!-- Completion statistics -->
+
+      <section class="card">
+        <h2>Round 1 completion</h2>
+
+        <p class="stat">
+          {result.summary.submitted}
+          /
+          {result.summary.assigned}
+        </p>
+
+        <p>
+          Submitted · {result.summary.drafts} in progress ·
+          {' '}
+          {result.summary.assigned -
+            result.summary.submitted -
+            result.summary.drafts}
+          {' '}
+          not started
+        </p>
+
+        <p class="muted">
+          Reload for the latest results.
+          Draft contents stay private.
+        </p>
+      </section>
+
+      <!-- NEW: Round comparison dashboard -->
+
+      <section aria-labelledby="comparison-heading">
+
+        <h2 id="comparison-heading">
+          Round 1 vs Round 2 — Comparative Analysis
+        </h2>
+
+        <p class="intro">
+          Explore how expert predictions changed
+          after reviewing anonymized group feedback.
+        </p>
+
+        <p class="muted">
+          Comparisons use only experts who submitted
+          both rounds. Results are withheld when
+          fewer than five valid paired answers exist
+          for a question.
+        </p>
+
+        {comparisonFailed ? (
+          <p class="notice">
+            Round 2 comparisons are not available yet.
+            The development database may still need
+            the Round 2 migration.
+          </p>
+        ) : comparisons.length === 0 ? (
+          <p class="notice">
+            No comparable Round 1 and Round 2
+            questions are available yet.
+          </p>
+        ) : (
+          comparisons.map((comparison) => (
+            <RoundComparisonChart
+              comparison={comparison}
+            />
+          ))
+        )}
+
+      </section>
+
+      <hr />
+
+      <!-- Existing Round 1 distributions -->
+
+      <h2>Round 1 — Original Predictions</h2>
+
+      <p class="muted">
+        These distributions include all submitted
+        Round 1 answers, including experts who have
+        not completed Round 2.
+      </p>
+
+      {
+        result.questionnaire.questions
+          .filter((question) => question.type === 'single')
+          .map((question) => {
+            const chart = pieSegments(
+              question,
+              result.distributions
+            );
+
+            return (
+              <section class="card">
+
+                <h2>{question.prompt}</h2>
+
+                {!chart.total && (
+                  <p class="muted">
+                    No responses yet.
+                  </p>
+                )}
+
+                {chart.total > 0 && (
+                  <div class="donut">
+
+                    <svg
+                      viewBox={`0 0 ${chart.size} ${chart.size}`}
+                      role="img"
+                      aria-label={
+                        chart.segments
+                          .map(
+                            (segment) =>
+                              `${segment.label}: ${segment.count} (${segment.percent}%)`
+                          )
+                          .join(', ')
+                      }
+                    >
+                      {chart.segments.map((segment) => (
+                        <circle
+                          cx={chart.center}
+                          cy={chart.center}
+                          r={chart.radius}
+                          fill="none"
+                          stroke={segment.color}
+                          stroke-width={chart.width}
+                          stroke-dasharray={segment.dasharray}
+                          stroke-dashoffset={segment.dashoffset}
+                          transform={`rotate(-90 ${chart.center} ${chart.center})`}
+                        />
+                      ))}
+                    </svg>
+
+                    <dl class="legend">
+                      {chart.segments.map((segment) => (
+                        <div class="row">
+
+                          <dt>
+                            <span
+                              class={`swatch ${segment.colorClass}`}
+                            ></span>
+                            {segment.label}
+                          </dt>
+
+                          <dd>
+                            {segment.count}
+                            {' · '}
+                            {segment.percent}%
+                          </dd>
+
+                        </div>
+                      ))}
+                    </dl>
+
+                  </div>
+                )}
+
+              </section>
+            );
+          })
+      }
+
+      <!-- Existing submitted answers -->
+
+      <h2>Submitted Round 1 Answers</h2>
+
+      <p class="muted">
+        Names, pseudonyms and user identifiers are
+        omitted. Treat free text as confidential
+        because it may contain identifying details.
+      </p>
+
+      {!result.summary.submitted && (
+        <p class="notice">
+          No submitted answers yet.
+        </p>
+      )}
+
+      {result.summary.submitted > 100 && (
+        <p class="notice">
+          Showing the latest 100 submissions.
+          Choice counts include all submissions.
+        </p>
+      )}
+
+      {
+        result.responses.map((response) => (
+          <article class="card">
+
+            <h3>Submitted response</h3>
+
+            {result.questionnaire.questions.map((question) => (
+              <>
+                <h4>{question.prompt}</h4>
+
+                <p class="answer-context">
+                  {answerLabel(
+                    question,
+                    response.answers[question.id]
+                  )}
+                </p>
+              </>
+            ))}
+
+          </article>
+        ))
+      }
+
+    </>
+  )}
+
 </AdminLayout>

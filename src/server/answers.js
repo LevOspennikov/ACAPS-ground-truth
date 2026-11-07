@@ -67,3 +67,36 @@ export function describeAnswers(questions, stored) {
     value: answerLabel({ ...question, type: question.type || 'text', options: questionOptions(question) }, String(answers[question.id] ?? '')),
   }));
 }
+
+/**
+ * Compare an expert's submitted Round 1 and Round 2 answers.
+ *
+ * Call this only after Round 2 has been submitted.
+ * The original answers are never modified.
+ */
+export function compareRoundAnswers(
+  questions,
+  roundOneAnswers,
+  roundTwoAnswers
+) {
+  return questions.map((question) => {
+    const original = String(
+      roundOneAnswers?.[question.id] ?? ''
+    ).trim();
+
+    const revised = String(
+      roundTwoAnswers?.[question.id] ?? ''
+    ).trim();
+
+    return {
+      questionId: question.id,
+      prompt: question.prompt,
+      type: question.type,
+
+      roundOne: answerLabel(question, original),
+      roundTwo: answerLabel(question, revised),
+
+      changed: original !== revised
+    };
+  });
+}

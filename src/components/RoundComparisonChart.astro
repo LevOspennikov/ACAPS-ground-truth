@@ -1,0 +1,275 @@
+
+---
+const { comparison } = Astro.props;
+
+const options = comparison?.withheld
+  ? []
+  : (comparison?.options ?? []);
+
+const chartHeight = 65 + options.length * 62;
+
+const barWidth = (percent) =>
+  Math.max(
+    0,
+    Math.min(360, Number(percent || 0) * 3.6)
+  );
+
+const formatPercent = (value) =>
+  `${Number(value || 0).toFixed(1)}%`;
+---
+
+<section class="card comparison-card">
+
+  <h3>{comparison.prompt}</h3>
+
+  {comparison.withheld ? (
+    <p class="muted">
+      Comparison withheld until at least five experts
+      have submitted valid answers in both rounds.
+    </p>
+  ) : (
+    <>
+
+      <div class="summary">
+        <p>
+          <strong>{comparison.totalExperts}</strong>
+          experts compared
+        </p>
+
+        <p>
+          <strong>{comparison.changedPercent}%</strong>
+          changed their answers
+        </p>
+      </div>
+
+      <div class="legend">
+        <span>
+          <i class="round-one"></i>
+          Round 1
+        </span>
+
+        <span>
+          <i class="round-two"></i>
+          Round 2
+        </span>
+      </div>
+
+      <div class="chart-scroll">
+        <svg
+          viewBox={`0 0 700 ${chartHeight}`}
+          role="img"
+          aria-label={`Round 1 versus Round 2 predictions for ${comparison.prompt}`}
+        >
+          <line
+            x1="225"
+            y1="22"
+            x2="225"
+            y2={chartHeight - 20}
+            stroke="#cbd5ce"
+          />
+
+          {options.map((option, index) => {
+            const y = 42 + index * 62;
+
+            return (
+              <g>
+                <title>
+                  {`${option.label}: Round 1 ${formatPercent(option.roundOnePercent)}, Round 2 ${formatPercent(option.roundTwoPercent)}`}
+                </title>
+
+                <text
+                  x="5"
+                  y={y + 18}
+                  font-size="14"
+                  fill="#17352f"
+                >
+                  {option.label.length > 27
+                    ? `${option.label.slice(0, 24)}...`
+                    : option.label}
+                </text>
+
+                <rect
+                  x="225"
+                  y={y}
+                  width={barWidth(option.roundOnePercent)}
+                  height="17"
+                  rx="3"
+                  fill="#235f47"
+                />
+
+                <rect
+                  x="225"
+                  y={y + 22}
+                  width={barWidth(option.roundTwoPercent)}
+                  height="17"
+                  rx="3"
+                  fill="#3a7ca5"
+                />
+
+                <text
+                  x={Math.min(
+                    635,
+                    233 + barWidth(option.roundOnePercent)
+                  )}
+                  y={y + 14}
+                  font-size="12"
+                  fill="#17352f"
+                >
+                  {formatPercent(option.roundOnePercent)}
+                </text>
+
+                <text
+                  x={Math.min(
+                    635,
+                    233 + barWidth(option.roundTwoPercent)
+                  )}
+                  y={y + 36}
+                  font-size="12"
+                  fill="#17352f"
+                >
+                  {formatPercent(option.roundTwoPercent)}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      <h4>Distribution changes</h4>
+
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Prediction</th>
+              <th>Round 1</th>
+              <th>Round 2</th>
+              <th>Change</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {options.map((option) => (
+              <tr>
+                <td>{option.label}</td>
+                <td>{formatPercent(option.roundOnePercent)}</td>
+                <td>{formatPercent(option.roundTwoPercent)}</td>
+                <td>
+                  {option.changePercentagePoints > 0 ? '+' : ''}
+                  {option.changePercentagePoints} pp
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {comparison.movement && (
+        <div class="movement">
+          <h4>Prediction movement</h4>
+
+          <p>
+            Increased:
+            <strong>{comparison.movement.increased}</strong>
+          </p>
+
+          <p>
+            Decreased:
+            <strong>{comparison.movement.decreased}</strong>
+          </p>
+
+          <p>
+            Unchanged:
+            <strong>{comparison.movement.unchanged}</strong>
+          </p>
+        </div>
+      )}
+
+    </>
+  )}
+
+</section>
+
+<style>
+  .comparison-card {
+    margin: 1.5rem 0;
+  }
+
+  .summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    margin: 1rem 0;
+  }
+
+  .summary strong {
+    display: block;
+    font-size: 1.8rem;
+  }
+
+  .legend {
+    display: flex;
+    gap: 1.5rem;
+    margin: 1rem 0;
+  }
+
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .legend i {
+    display: inline-block;
+    width: 15px;
+    height: 15px;
+    border-radius: 3px;
+  }
+
+  .round-one {
+    background: #235f47;
+  }
+
+  .round-two {
+    background: #3a7ca5;
+  }
+
+  .chart-scroll,
+  .table-scroll {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  svg {
+    display: block;
+    min-width: 600px;
+    width: 100%;
+    height: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+    font-size: 0.9rem;
+  }
+
+  th,
+  td {
+    padding: 0.7rem;
+    text-align: left;
+    border-bottom: 1px solid #d4ddd1;
+  }
+
+  .movement {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid #d4ddd1;
+  }
+
+  .movement p {
+    display: flex;
+    justify-content: space-between;
+    max-width: 320px;
+  }
+</style>

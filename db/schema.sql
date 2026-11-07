@@ -78,3 +78,21 @@ ALTER TABLE experts ADD COLUMN IF NOT EXISTS region_slug text REFERENCES regions
 ALTER TABLE experts ADD COLUMN IF NOT EXISTS focus text NOT NULL DEFAULT '';
 ALTER TABLE questionnaires ADD COLUMN IF NOT EXISTS region_slug text REFERENCES regions(slug);
 ALTER TABLE questionnaires ADD COLUMN IF NOT EXISTS sent_at timestamptz;
+
+-- Round 2: Store revised expert assessments separately.
+-- Preserve original Round 1 answers in the responses table.
+
+CREATE TABLE IF NOT EXISTS round_two_responses (
+    assignment_id uuid PRIMARY KEY
+        REFERENCES assignments(id) ON DELETE CASCADE,
+
+    answers jsonb NOT NULL DEFAULT '{}'::jsonb
+        CHECK (jsonb_typeof(answers) = 'object'),
+
+    progress_step integer NOT NULL DEFAULT 0
+        CHECK (progress_step >= 0),
+
+    updated_at timestamptz NOT NULL DEFAULT now(),
+
+    submitted_at timestamptz
+);

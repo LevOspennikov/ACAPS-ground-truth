@@ -44,3 +44,55 @@ export async function invitationMatchesSession(cookies, invitation, getSql = db)
     AND i.token_hash = ${hash(invitation)}`;
   return Boolean(match);
 }
+
+/**
+ * Load Round 2 for an authenticated expert.
+ * Only experts who submitted Round 1 can access Round 2.
+ */
+export async function roundTwoAssignment(cookies) {
+  const session = cookies.get('expert')?.value;
+
+  if (!session) return null;
+
+  const sql = db();
+
+  const [assignment] = await sql`
+    SELECT
+      a.id,
+      q.title,
+      q.context AS description,
+      q.questions,
+
+      r.answers AS round_one_answers,
+      r.submitted_at AS round_one_submitted_at,
+
+      rt.answers AS round_two_answers,
+      rt.progress_step AS round_two_progress_step,
+      rt.submitted_at AS round_two_submitted_at
+
+    FROM expert_sessions s
+
+    JOIN assignments a
+      ON a.id = s.assignment_id
+
+    JOIN experts e
+      ON e.id = a.expert_id
+
+    JOIN questionnaires q
+      ON q.id = a.questionnaire_id
+
+    JOIN responses r
+      ON r.assignment_id = a.id
+      AND r.submitted_at IS NOT NULL
+
+    LEFT JOIN round_two_responses rt
+      ON rt.assignment_id = a.id
+
+    WHERE
+      s.token_hash = ${hash(session)}
+      AND s.expires_at > now()
+      AND e.active = true
+  `;
+
+  return assignment || null;
+}
