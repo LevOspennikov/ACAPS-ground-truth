@@ -7,6 +7,7 @@ const current = region.questionnaires.filter((item) => !item.sent);
 const sent = region.questionnaires.filter((item) => item.sent);
 const summaryFields = riskRadarSummaryKeys.filter((key) => key !== "country").map((key) => riskRadarFields.find((field) => field.key === key));
 const additionalFields = riskRadarFields.filter((field) => !riskRadarSummaryKeys.includes(field.key));
+const generateError = Astro.url.searchParams.get("error");
 const riskHref = (riskId) => links === "overview"
   ? `/admin?${new URLSearchParams({ country: region.slug, risk: riskId })}`
   : `/admin/regions/${region.slug}?risk=${encodeURIComponent(riskId)}`;
@@ -74,11 +75,12 @@ const riskHref = (riskId) => links === "overview"
       </ul>
       <form method="post" action="/api/admin/region-questionnaire" data-astro-reload>
         <h3>New questionnaire</h3>
+        {generateError === "key" && <p class="notice error" role="alert">Set GREEN_PT_API_KEY on the server, then generate again.</p>}
+        {generateError === "generate" && <p class="notice error" role="alert">The questionnaire could not be generated. Try again.</p>}
+        <p>Uses this risk to generate 3–5 multiple-choice questions, then asks what we missed.</p>
         <input type="hidden" name="region" value={region.slug} />
         <input type="hidden" name="risk" value={risk.risk_id} />
-        <label for="topic">Topic</label>
-        <input id="topic" name="topic" maxlength="180" required />
-        <div class="actions"><button>Create questionnaire</button></div>
+        <div class="actions"><button>Generate questionnaire</button></div>
       </form>
     </>
   )}
