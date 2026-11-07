@@ -3,8 +3,9 @@ import { db } from './db.js';
 import { hash, token } from './auth.js';
 import { isUuid } from './ids.js';
 import { coverageEligibility } from './coverage.js';
+import { emailInvitation } from './invitation-email.js';
 
-export async function inviteQuestionnaireRecipients(slug, questionnaireId, expertIds) {
+export async function inviteQuestionnaireRecipients(slug, questionnaireId, expertIds, origin) {
   const ids = [...new Set(expertIds)];
   if (!ids.length || ids.length > 50 || ids.some((id) => typeof id !== 'string' || !isUuid(id))) throw new Error('Choose between 1 and 50 recipients.');
   const sql = db();
@@ -25,11 +26,20 @@ export async function inviteQuestionnaireRecipients(slug, questionnaireId, exper
     ...invitations.map((invitation) => sql`INSERT INTO invitations (token_hash, assignment_id, expires_at)
       SELECT ${hash(invitation.token)}, a.id, now() + interval '48 hours' FROM assignments a
       WHERE a.questionnaire_id = ${questionnaireId}::uuid AND a.expert_id = ${invitation.id}::uuid RETURNING assignment_id`),
+    sql`SELECT e.id, e.pseudonym, e.profile_mode, e.email, e.active, q.title
+      FROM experts e CROSS JOIN questionnaires q
+      WHERE e.id = ANY(${ids}::uuid[]) AND q.id = ${questionnaireId}::uuid`,
   ];
-  try { await sql.transaction(queries); }
+  let result;
+  try { result = await sql.transaction(queries); }
   catch (error) {
     if (error.code === '22012') throw new Error('Recipients are no longer eligible, or the questionnaire has no questions. Refresh the questionnaire and try again.');
     throw new Error('Could not create invitations. Nothing was saved; please retry.');
   }
-  return invitations;
+  const recipients = result.at(-1);
+  return Promise.all(invitations.map(async (invitation) => {
+    const expert = recipients.find((recipient) => recipient.id === invitation.id);
+    const emailStatus = await emailInvitation({ expert, token: invitation.token, title: expert?.title, origin });
+    return { ...invitation, pseudonym: expert?.pseudonym || 'Selected expert', emailStatus };
+  }));
 }

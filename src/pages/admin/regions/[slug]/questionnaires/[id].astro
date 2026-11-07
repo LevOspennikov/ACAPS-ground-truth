@@ -102,6 +102,7 @@ const questionnaire = page?.questionnaire;
         )}
 
         <section class="card"><h2>Recipients and invitation links</h2>
+          <p>Generating links also attempts email for named profiles with an email address. Anonymous profiles use manual links. Check the email status on the next page.</p>
           <p>Choose active experts covering {region.name}{questionnaire.risk_id ? ` and ${questionnaire.risk_id}` : ''}. Existing recipients can receive fresh links even after their coverage changes. Answers are preserved.</p>
           <p><a href="/admin/users">Manage experts and their country/risk coverage →</a></p>
           {!recipients.length ? <p class="notice">No eligible experts. Add this country and risk coverage to a user profile, then return here.</p> : <form method="post" action={`/admin/regions/${region.slug}/questionnaires/${questionnaire.id}/invitations`}>
