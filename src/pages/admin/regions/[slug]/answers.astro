@@ -4,7 +4,7 @@ import AdminAccess from "../../../../components/AdminAccess.astro";
 import { configured } from "../../../../server/db.js";
 import { isAdmin } from "../../../../server/auth.js";
 import { riskAnswers } from "../../../../server/regions.js";
-import { pieSegments, chartColor } from "../../../../server/charts.js";
+import { pieSegments, chartColorClass } from "../../../../server/charts.js";
 
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
@@ -36,12 +36,12 @@ if (authenticated && !loadError && !page) return new Response("Risk not found", 
               const chart = question.type === 'single' ? pieSegments(question, questionnaire.distributions) : null;
               return <section>
                 <h4>{question.prompt}</h4>
-                {chart && chart.total > 0 && <div class="donut"><svg viewBox={`0 0 ${chart.size} ${chart.size}`} role="img" aria-label={chart.segments.map((s) => `${s.label}: ${s.count} (${s.percent}%)`).join(', ')}>{chart.segments.map((s) => <circle cx={chart.center} cy={chart.center} r={chart.radius} fill="none" stroke={s.color} stroke-width={chart.width} stroke-dasharray={s.dasharray} stroke-dashoffset={s.dashoffset} transform={`rotate(-90 ${chart.center} ${chart.center})`} />)}</svg><dl class="legend">{chart.segments.map((s) => <div class="row"><dt><span class="swatch" style={`background:${s.color}`}></span>{s.label}</dt><dd>{s.count} · {s.percent}%</dd></div>)}</dl></div>}
+                {chart && chart.total > 0 && <div class="donut"><svg viewBox={`0 0 ${chart.size} ${chart.size}`} role="img" aria-label={chart.segments.map((s) => `${s.label}: ${s.count} (${s.percent}%)`).join(', ')}>{chart.segments.map((s) => <circle cx={chart.center} cy={chart.center} r={chart.radius} fill="none" stroke={s.color} stroke-width={chart.width} stroke-dasharray={s.dasharray} stroke-dashoffset={s.dashoffset} transform={`rotate(-90 ${chart.center} ${chart.center})`} />)}</svg><dl class="legend">{chart.segments.map((s) => <div class="row"><dt><span class={`swatch ${s.colorClass}`}></span>{s.label}</dt><dd>{s.count} · {s.percent}%</dd></div>)}</dl></div>}
                 <ul class="contacts">
                   {question.replies.map((reply) => (
                     <li>
                       <p><strong>{reply.expert}</strong> · {reply.date}</p>
-                      <p class="answer-context">{question.type === 'single' && reply.option != null && <span class="answer-swatch" style={`background:${chartColor(reply.option)}`}></span>}{reply.value}</p>
+                      <p class="answer-context">{question.type === 'single' && reply.option != null && <span class={`answer-swatch ${chartColorClass(reply.option)}`}></span>}{reply.value}</p>
                     </li>
                   ))}
                 </ul>
