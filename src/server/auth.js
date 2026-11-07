@@ -64,6 +64,7 @@ export async function roundTwoAssignment(cookies, getSql = db) {
       q.title,
       q.context AS description,
       q.questions,
+      q.round_two_started_at,
 
       r.answers AS round_one_answers,
       r.submitted_at AS round_one_submitted_at,

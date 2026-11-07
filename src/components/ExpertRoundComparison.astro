@@ -1,0 +1,57 @@
+---
+import { expertResults } from '../server/expert-results.js';
+const { question } = Astro.props;
+let before = null;
+let after = null;
+let failure = '';
+try {
+  const [original, revised] = await Promise.all([
+    expertResults(Astro.cookies, { questionId: question.id, frozen: true }),
+    expertResults(Astro.cookies, { questionId: question.id, roundTwo: true }),
+  ]);
+  before = original?.questions.find((item) => item.id === question.id);
+  after = revised?.questions.find((item) => item.id === question.id);
+} catch (error) {
+  failure = error.code === 'invalid_results_configuration'
+    ? 'Results are withheld because server configuration needs attention. Contact your organiser.'
+    : 'Results are unavailable. Refresh the page to retry.';
+}
+const visible = (round) => round && !round.withheld;
+const totalLabel = (round) => !round ? 'Unavailable' : round.withheld ? 'Withheld' : `${round.total} ${round.total === 1 ? 'response' : 'responses'}`;
+---
+
+{failure || (!before && !after) ? <p class="muted" role="status">{failure || 'Your session ended or access changed. Open a fresh invitation to view results.'}</p> : <>
+  <table class="rounds-table">
+    <caption class="sr-only">Group answer distributions for {question.prompt}. Percentages with counts in parentheses; change in percentage points.</caption>
+    <colgroup><col class="option-column" /><col /><col /><col class="change-column" /></colgroup>
+    <thead>
+      <tr>
+        <th scope="col">Answer</th>
+        <th scope="col"><span class="round-key round-key-one"></span>Round 1<small>{totalLabel(before)}</small></th>
+        <th scope="col"><span class="round-key round-key-two"></span>Round 2<small>{totalLabel(after)}</small></th>
+        <th scope="col">Change<small>pp</small></th>
+      </tr>
+    </thead>
+    <tbody>
+      {question.options.map((label, index) => {
+        const one = visible(before) ? before.options[index] : null;
+        const two = visible(after) ? after.options[index] : null;
+        const change = before?.total && after?.total && one && two ? two.percent - one.percent : null;
+        return <tr>
+          <th scope="row">{label}</th>
+          {[one, two].map((value, round) => <td>
+            {value ? <>
+              <span class="round-value"><strong>{value.percent}%</strong> <small>({value.count})</small></span>
+              <svg class="comparison-meter" viewBox="0 0 100 5" preserveAspectRatio="none" aria-hidden="true">
+                <rect class="meter-track" width="100" height="5" rx="2.5" />
+                <rect class={round ? 'meter-two' : 'meter-one'} width={value.percent} height="5" rx="2.5" />
+              </svg>
+            </> : <span class="muted">—</span>}
+          </td>)}
+          <td class="round-change">{change === null ? '—' : `${change > 0 ? '+' : ''}${change}`}</td>
+        </tr>;
+      })}
+    </tbody>
+  </table>
+  {(before?.withheld || after?.withheld) && <p class="comparison-note">Withheld: too few submitted answers for this question. Round 1 uses the group captured when Round 2 opened.</p>}
+</>}
