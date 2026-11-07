@@ -167,7 +167,7 @@ Questionnaires stay single-round until an organiser explicitly opens Round 2. Ex
 
 To open reassessment:
 
-1. From the country/risk overview, the questionnaire editor, or **All answers for this risk**, open **Results and rounds**.
+1. From the country/risk overview or **All answers for this risk**, choose **Manage questionnaire**. This opens the existing questionnaire management page, with invitations first for sent questionnaires and question editing first for drafts. Its navigation links to **Invitations**, **Questions**, and **Results and rounds**. Open **Results and rounds** to manage the consultation rounds.
 2. Collect at least one submitted response, then select **Start Round 2** when the panel is ready. This locks the questions and captures the submitted Round 1 choice distributions in one database statement. Repeated starts preserve the initial snapshot. The minimum expert-results threshold still applies separately to each question; starting with a small group may leave feedback withheld throughout reassessment.
 3. Experts return through their existing invitation/session to `/questionnaire`. After their own Round 1 submission, this page now offers **Continue to Round 2** (or **View your Round 2 results** after submitting). No separate invitation or password is required. An expired session still requires a fresh link to the same assignment.
 4. During reassessment, `/round-two` shows the original answer and frozen Round 1 feedback for the current choice question only. Text questions and the review screen show no group distributions. Original answers are preselected for convenience; changes are saved separately. Refreshing results stays on the current Round 2 step.

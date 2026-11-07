@@ -75,11 +75,11 @@ if (!result) {
       <a
         href={
           result.questionnaire.region_slug
-            ? `/admin/regions/${result.questionnaire.region_slug}`
+            ? `/admin/regions/${result.questionnaire.region_slug}/questionnaires/${result.questionnaire.id}`
             : '/admin'
         }
       >
-        ← {result.questionnaire.crisis_title}
+        ← {result.questionnaire.region_slug ? 'Manage questionnaire' : result.questionnaire.crisis_title}
       </a>
 
       <p class="eyebrow">

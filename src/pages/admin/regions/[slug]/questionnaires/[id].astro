@@ -5,6 +5,7 @@ import { configured } from "../../../../../server/db.js";
 import { isAdmin } from "../../../../../server/auth.js";
 import { questionnaireRecipients } from "../../../../../server/coverage.js";
 import { editorPage } from "../../../../../server/regions.js";
+import QuestionnaireInvitations from "../../../../../components/QuestionnaireInvitations.astro";
 
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
@@ -21,7 +22,7 @@ const region = page?.region;
 const questionnaire = page?.questionnaire;
 ---
 
-<Layout title={questionnaire?.topic || "Questionnaire"}>
+<Layout title="Manage questionnaire">
   <AdminAccess ready={ready} authenticated={authenticated}>
     {loadError ? (
       <p class="notice error" role="alert">This questionnaire could not be loaded.</p>
@@ -29,8 +30,14 @@ const questionnaire = page?.questionnaire;
       <>
         <p><a href={questionnaire.risk_id ? `/admin/regions/${region.slug}?risk=${encodeURIComponent(questionnaire.risk_id)}` : `/admin/regions/${region.slug}`}>Back to {region.name}</a></p>
         {questionnaire.risk_id ? <p class="notice"><strong>{questionnaire.risk_id}</strong> · {questionnaire.risk_title}</p> : <p class="notice">This existing questionnaire has no risk yet. Link it from the country page.</p>}
-        <h1>{questionnaire.topic}</h1>
-        <p><a href={`/admin/results/${questionnaire.id}`}>Results and rounds →</a></p>
+        <h1>Manage questionnaire</h1>
+        <p class="intro">{questionnaire.topic}</p>
+        <nav class="questionnaire-management-nav" aria-label="Questionnaire management">
+          {!questionnaire.sent && <a href="#questions">Questions</a>}
+          <a href="#invitations">Invitations</a>
+          {questionnaire.sent && <a href="#questions">Questions</a>}
+          <a href={`/admin/results/${questionnaire.id}`}>Results and rounds</a>
+        </nav>
         <p class="muted">Opened {questionnaire.opened} · {region.name}</p>
         {questionnaire.sent && <p class="notice" role="status">First invitations created on {questionnaire.sent}. Questions are locked; additional recipients and return links can be selected below.</p>}
         {error === "options" && <p class="notice error" role="alert">Multiple choice needs at least two options, one per line.</p>}
@@ -38,7 +45,9 @@ const questionnaire = page?.questionnaire;
         {error === "locked" && <p class="notice error" role="alert">This questionnaire has already been sent.</p>}
         {Astro.url.searchParams.get('manual') === '1' && !questionnaire.sent && !questionnaire.questions.length && <p class="notice" role="status">Automatic question drafting is unavailable. Add your questions below.</p>}
 
-        <h2>Questions</h2>
+        {questionnaire.sent && <QuestionnaireInvitations region={region} questionnaire={questionnaire} recipients={recipients} />}
+
+        <h2 id="questions">Questions</h2>
         {!questionnaire.questions.length && <p>No questions yet.</p>}
         {questionnaire.questions.map((question, index) => (
           <article class="card">
@@ -103,17 +112,27 @@ const questionnaire = page?.questionnaire;
           </form>
         )}
 
-        <section class="card"><h2>Recipients and invitation links</h2>
-          <p>Generating links also attempts email for named profiles with an email address. Anonymous profiles use manual links. Check the email status on the next page.</p>
-          <p>Choose active experts covering {region.name}{questionnaire.risk_id ? ` and ${questionnaire.risk_id}` : ''}. Existing recipients can receive fresh links even after their coverage changes. Answers are preserved.</p>
-          <p><a href="/admin/users">Manage experts and their country/risk coverage →</a></p>
-          {!recipients.length ? <p class="notice">No eligible experts. Add this country and risk coverage to a user profile, then return here.</p> : <form method="post" action={`/admin/regions/${region.slug}/questionnaires/${questionnaire.id}/invitations`}>
-            <fieldset><legend>Expert recipients</legend>{recipients.map((expert) => <label class="choice"><input type="checkbox" name="recipients" value={expert.id} />{expert.pseudonym} · {expert.submitted_at ? 'Submitted' : expert.updated_at ? 'In progress' : expert.assignment_id ? 'Assigned' : 'Not assigned'}{!expert.currently_eligible && ' · Existing assignment outside current coverage'}</label>)}</fieldset>
-            <div class="actions"><button disabled={!questionnaire.sent && !questionnaire.questions.length}>Generate invitation links</button></div>
-            {!questionnaire.sent && !questionnaire.questions.length && <p class="muted">Add at least one question first.</p>}
-          </form>}
-        </section>
+        {!questionnaire.sent && <QuestionnaireInvitations region={region} questionnaire={questionnaire} recipients={recipients} />}
       </>
     )}
   </AdminAccess>
 </Layout>
+
+<style>
+  .questionnaire-management-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.25rem;
+    margin: 1rem 0;
+    padding: .75rem 0;
+    border-top: 1px solid #d4ddd1;
+    border-bottom: 1px solid #d4ddd1;
+  }
+  .questionnaire-management-nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    font-weight: 650;
+  }
+  #questions, #invitations { scroll-margin-top: 1rem; }
+</style>

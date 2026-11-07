@@ -1,0 +1,14 @@
+---
+const { region, questionnaire, recipients = [] } = Astro.props;
+---
+
+<section class="card" id="invitations" aria-labelledby="invitations-heading"><h2 id="invitations-heading">Manage invitations</h2>
+  <p>Generating links also attempts email for named profiles with an email address. Anonymous profiles use manual links. Check the email status on the next page.</p>
+  <p>Choose active experts covering {region.name}{questionnaire.risk_id ? ` and ${questionnaire.risk_id}` : ''}. Existing recipients can receive fresh links even after their coverage changes. Answers are preserved.</p>
+  <p><a href="/admin/users">Manage experts and their country/risk coverage →</a></p>
+  {!recipients.length ? <p class="notice">No eligible experts. Add this country and risk coverage to a user profile, then return here.</p> : <form method="post" action={`/admin/regions/${region.slug}/questionnaires/${questionnaire.id}/invitations`}>
+    <fieldset><legend>Expert recipients</legend>{recipients.map((expert) => <label class="choice"><input type="checkbox" name="recipients" value={expert.id} />{expert.pseudonym} · {expert.submitted_at ? 'Submitted' : expert.updated_at ? 'In progress' : expert.assignment_id ? 'Assigned' : 'Not assigned'}{!expert.currently_eligible && ' · Existing assignment outside current coverage'}</label>)}</fieldset>
+    <div class="actions"><button disabled={!questionnaire.sent && !questionnaire.questions.length}>Generate invitation links</button></div>
+    {!questionnaire.sent && !questionnaire.questions.length && <p class="muted">Add at least one question first.</p>}
+  </form>}
+</section>
