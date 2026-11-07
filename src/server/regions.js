@@ -37,7 +37,7 @@ export async function regionBoard(slug, riskId = "", { includeContacts = false }
   // selected risk in SQL too, so questionnaires need no second round trip.
   const queries = [
     sql`SELECT slug, name FROM regions WHERE slug = ${slug}`,
-    sql`SELECT * FROM risk_radar WHERE region_slug = ${slug} ORDER BY risk_id`,
+    sql`SELECT * FROM risk_radar WHERE region_slug = ${slug} ORDER BY risk_id DESC`,
     sql`SELECT id, title, created_at, sent_at FROM questionnaires
       WHERE region_slug = ${slug} AND risk_id = (
         SELECT risk_id FROM risk_radar WHERE region_slug = ${slug}
