@@ -10,6 +10,7 @@ const summaryFields = riskRadarSummaryKeys.filter((key) => key !== "country").ma
 const primaryRiskKeys = ["risk_type", "status", "probability", "risk_level", "risk_trend", "intensity_of_hazard", "impact"];
 const primaryFields = primaryRiskKeys.map((key) => riskRadarFields.find((field) => field.key === key));
 const additionalFields = riskRadarFields.filter((field) => !["risk_id", "risk_title", "country", "iso", ...primaryRiskKeys].includes(field.key));
+const shortRiskTitle = (title) => title.length > 40 ? `${title.slice(0, 40).trimEnd()}…` : title;
 const generateError = Astro.url.searchParams.get("error");
 const riskHref = (riskId) => links === "overview"
   ? `/admin?${new URLSearchParams({ country: region.slug, risk: riskId })}`
@@ -20,7 +21,7 @@ const riskHref = (riskId) => links === "overview"
   <h2 id="risk-heading">Risks in {region.name}</h2>
   {region.risks.length ? (compact ? <nav class="risk-list" aria-label={`Risks in ${region.name}`}>
       <ul>{region.risks.map((item) => (
-        <li><a class="risk-list-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined}><span class="risk-list-id">{item.risk_id}</span><span>{item.risk_title}</span><span class="risk-list-arrow" aria-hidden="true">→</span></a></li>
+        <li><a class="risk-list-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined} title={item.risk_title}><span class="risk-list-id">{item.risk_id}</span><span>{shortRiskTitle(item.risk_title)}</span><span class="risk-list-arrow" aria-hidden="true">→</span></a></li>
       ))}</ul>
     </nav> : <nav class="region-grid" aria-label="Risks">
       {region.risks.map((item) => <a class="region-link" href={riskHref(item.risk_id)} aria-current={risk?.risk_id === item.risk_id ? "page" : undefined}>{item.risk_id} · {item.risk_title}</a>)}
