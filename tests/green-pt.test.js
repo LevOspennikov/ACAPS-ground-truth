@@ -13,7 +13,7 @@ test('generated questions stay between three and five and end with the free-text
     { prompt: 'A fifth constraint', options: ['A', 'B'] },
     { prompt: 'This question is past the limit', options: ['A', 'B'] },
   ]});
-  const questions = parseGeneratedQuestions(`\`\`\`json\n${content}\n\`\`\``);
+  const questions = parseGeneratedQuestions(`The outlook uses {months}.\n\`\`\`json\n${content}\n\`\`\``);
   assert.equal(questions.length, 6);
   assert.equal(questions[0].type, 'single');
   assert.equal(questions[4].prompt, 'A fifth constraint');
