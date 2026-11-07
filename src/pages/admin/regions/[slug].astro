@@ -2,6 +2,7 @@
 import Layout from "../../../layouts/Layout.astro";
 import AdminAccess from "../../../components/AdminAccess.astro";
 import RiskQuestionnaires from "../../../components/RiskQuestionnaires.astro";
+import CountryRiskNavigation from "../../../components/CountryRiskNavigation.astro";
 import Participation from "../../../components/Participation.astro";
 import { contactHref } from "../../../server/forms.js";
 import { configured } from "../../../server/db.js";
@@ -13,7 +14,7 @@ const authenticated = ready && isAdmin(Astro.cookies);
 let region = null;
 let loadError = false;
 if (authenticated) {
-  try { region = await regionBoard(Astro.params.slug, (Astro.url.searchParams.get("risk") || "").slice(0, 40)); }
+  try { region = await regionBoard(Astro.params.slug, (Astro.url.searchParams.get("risk") || "").slice(0, 40), { includeContacts: true }); }
   catch { loadError = true; }
 }
 if (authenticated && !loadError && !region) return new Response("Country not found", { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });
@@ -21,16 +22,17 @@ if (authenticated && !loadError && !region) return new Response("Country not fou
 ---
 
 <Layout title={region?.name || "Country"}>
+  <Fragment slot="head">{authenticated && <CountryRiskNavigation />}</Fragment>
   <AdminAccess ready={ready} authenticated={authenticated}>
     {loadError ? (
       <div class="notice error" role="alert">
         <p>This country could not be loaded. Initialize the tables if they are missing.</p>
-        <form method="post" action="/api/admin/setup"><button>Initialize database tables</button></form>
+        <form method="post" action="/api/admin/setup" data-astro-reload><button>Initialize database tables</button></form>
       </div>
     ) : region && <>
     <p><a href="/admin">All countries</a></p>
     <h1 class="region-title">{region.name}</h1>
-    <div class="region-board">
+    <div class="region-board" id="country-risk-panel">
       <RiskQuestionnaires region={region} />
       <section class="card" aria-labelledby="contacts-heading">
         <h2 id="contacts-heading">Contacts</h2>
@@ -44,7 +46,7 @@ if (authenticated && !loadError && !region) return new Response("Country not fou
             </li>
           ))}
         </ul>
-        <form method="post" action="/api/admin/contact">
+        <form method="post" action="/api/admin/contact" data-astro-reload>
           <h3>Add a contact</h3>
           <input type="hidden" name="region" value={region.slug} />
           <label for="contact-name">Name</label>

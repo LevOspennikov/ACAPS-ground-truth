@@ -1,0 +1,17 @@
+---
+const { countries = [], coverage = [] } = Astro.props;
+---
+<fieldset><legend>Countries and risk coverage</legend>
+  <p>Select at least one country. For each selected country, cover all risks or choose specific risks. Coverage changes affect future invitations; existing assignments and answers stay accessible.</p>
+  {!countries.length && <p class="notice">No countries available. Initialize the country data from admin first.</p>}
+  {countries.map((country) => {
+    const membership = coverage.find((item) => item.region === country.slug);
+    return <details class="card" open={Boolean(membership)}>
+      <summary>{country.name}{membership ? ' · assigned' : ''}</summary>
+      <label class="choice"><input type="checkbox" name="countries" value={country.slug} checked={Boolean(membership)} />Include {country.name}</label>
+      <label class="choice"><input type="radio" name={`scope_${country.slug}`} value="all" checked={!membership || membership.scope === 'all'} />All risks in {country.name}</label>
+      <label class="choice"><input type="radio" name={`scope_${country.slug}`} value="selected" checked={membership?.scope === 'selected'} />Only selected risks below</label>
+      {country.risks.length ? country.risks.map((risk) => <label class="choice"><input type="checkbox" name={`risks_${country.slug}`} value={risk.risk_id} checked={membership?.risks.includes(risk.risk_id)} />{risk.risk_id} · {risk.risk_title}</label>) : <p class="muted">No specific risks yet; choose all-risk coverage.</p>}
+    </details>;
+  })}
+</fieldset>

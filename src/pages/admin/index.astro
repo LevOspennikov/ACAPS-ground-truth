@@ -3,6 +3,7 @@ import Layout from '../../layouts/Layout.astro';
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AdminAccess from '../../components/AdminAccess.astro';
 import RiskQuestionnaires from '../../components/RiskQuestionnaires.astro';
+import CountryRiskNavigation from '../../components/CountryRiskNavigation.astro';
 import { configured } from '../../server/db.js';
 import { isAdmin } from '../../server/auth.js';
 import { listRegions, regionBoard } from '../../server/regions.js';
@@ -15,21 +16,27 @@ const PageLayout = authenticated ? AdminLayout : Layout;
 let regions = []; let selected = null; let failed = false;
 if (authenticated) {
   try {
-    regions = await listRegions(search);
-    const slug = country || regions[0]?.slug;
-    if (slug) selected = await regionBoard(slug, risk);
+    if (country) {
+      [regions, selected] = await Promise.all([listRegions(search), regionBoard(country, risk)]);
+    } else {
+      regions = await listRegions(search);
+      if (regions[0]) selected = await regionBoard(regions[0].slug, risk);
+    }
   } catch { failed = true; Astro.response.status = 503; }
 }
 ---
 <PageLayout title="Country risks">
+  <Fragment slot="head">{authenticated && <CountryRiskNavigation />}</Fragment>
   <AdminAccess ready={ready} authenticated={authenticated}>
     <div class="row"><div><p class="eyebrow">ACAPS GROUND TRUTH</p><h1>Country risks</h1></div></div>
     {failed ? <p class="notice error" role="alert">Country risk data could not be loaded. Apply the updated database schema and seed, then retry.</p> : <>
       <form class="search" method="get"><label for="q">Search countries</label><input id="q" name="q" value={search} maxlength="80" /><button>Search</button><a href="/admin">Clear</a></form>
-      <nav class="region-grid" aria-label="Countries">{regions.map((r) => <a class="region-link" aria-current={selected?.slug === r.slug ? 'page' : undefined} href={`/admin?country=${encodeURIComponent(r.slug)}`}>{r.name} · {r.risks} risks</a>)}</nav>
+      <nav id="country-selection" class="region-grid" aria-label="Countries">{regions.map((r) => <a class="region-link" aria-current={selected?.slug === r.slug ? 'page' : undefined} href={`/admin?country=${encodeURIComponent(r.slug)}`}>{r.name} · {r.risks} risks</a>)}</nav>
       {!regions.length && <p class="notice">No countries found.</p>}
-      {country && !selected && <p class="notice error">Country not found. Choose a country above.</p>}
-      {selected && <><h2>{selected.name}</h2><p><a href={`/admin/regions/${selected.slug}`}>Open {selected.name} →</a></p><RiskQuestionnaires region={selected} links="overview" /></>}
+      <div id="country-risk-panel">
+        {country && !selected && <p class="notice error">Country not found. Choose a country above.</p>}
+        {selected && <><h2>{selected.name}</h2><p><a href={`/admin/regions/${selected.slug}`}>Open {selected.name} →</a></p><RiskQuestionnaires region={selected} links="overview" /></>}
+      </div>
     </>}
   </AdminAccess>
 </PageLayout>

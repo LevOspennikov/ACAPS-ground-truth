@@ -1,5 +1,6 @@
 import { redirect, textField } from "../../../server/forms.js";
-import { addQuestion, denyUnlessAdmin, removeQuestion, sendQuestionnaire } from "../../../server/regions.js";
+import { addQuestion, removeQuestion } from "../../../server/regions.js";
+import { denyUnlessAdmin } from "../../../server/auth.js";
 
 const types = ["single", "text"];
 
@@ -31,14 +32,6 @@ export async function POST({ request, cookies }) {
     return back(region, questionnaire);
   }
 
-  if (action === "send") {
-    const sent = await sendQuestionnaire(region, questionnaire);
-    if (!sent) return back(region, questionnaire, "locked");
-    if (sent.error === "questions") return back(region, questionnaire, "send");
-    if (sent.error === "contacts") return back(region, questionnaire, "contacts");
-    return back(region, questionnaire);
-  }
-
   if (action !== "add") return redirect("/admin");
   let prompt;
   let type;
@@ -53,11 +46,11 @@ export async function POST({ request, cookies }) {
     return back(region, questionnaire, "question");
   }
   if (!types.includes(type)) return back(region, questionnaire, "question");
-  const question = { type, prompt, options: "", placeholder: "" };
+  const question = { type, prompt, options: [], placeholder: "" };
   if (type === "single") {
     const options = optionsText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).slice(0, 8);
     if (options.length < 2 || options.some((option) => option.length > 180)) return back(region, questionnaire, "options");
-    question.options = options.join("\n");
+    question.options = options;
   }
   if (type === "text") question.placeholder = placeholder;
   if (!await addQuestion(region, questionnaire, question)) return back(region, questionnaire, "locked");

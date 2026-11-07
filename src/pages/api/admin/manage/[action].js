@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { configured, db } from '../../../../server/db.js';
-import { isAdmin, cookieOptions } from '../../../../server/auth.js';
-import { sameOrigin, textField, redirect, reject } from '../../../../server/forms.js';
+import { db } from '../../../../server/db.js';
+import { cookieOptions, denyUnlessAdmin } from '../../../../server/auth.js';
+import { textField, redirect, reject } from '../../../../server/forms.js';
+import { readCoverage, coverageQueries } from '../../../../server/coverage.js';
 import { profileFields } from '../../../../server/profiles.js';
 import { validId, createQuestionnaire, assignQuestionnaire, generateInvitation, setUserActive } from '../../../../server/management.js';
 
 export async function POST({ request, cookies, params }) {
-  if (!sameOrigin(request) || !configured() || !isAdmin(cookies)) return reject('Forbidden', 403);
+  const denied = denyUnlessAdmin(request, cookies);
+  if (denied) return denied;
   const form = await request.formData();
   const sql = db();
   const idField = (name) => {
@@ -21,7 +23,8 @@ export async function POST({ request, cookies, params }) {
       case 'user-create': {
         const p = profileFields(form);
         const id = randomUUID();
-        await sql`INSERT INTO experts (id, pseudonym, profile_mode, name, email) VALUES (${id}, ${p.pseudonym}, ${p.mode}, ${p.name}, ${p.email})`;
+        const coverage = await readCoverage(form);
+        await sql.transaction([sql`INSERT INTO experts (id, pseudonym, profile_mode, name, email, region_slug) VALUES (${id}, ${p.pseudonym}, ${p.mode}, ${p.name}, ${p.email}, ${coverage[0].region})`, ...coverageQueries(sql, id, coverage)]);
         destination = `/admin/users/${id}`;
         break;
       }
@@ -31,7 +34,8 @@ export async function POST({ request, cookies, params }) {
         const [existing] = await sql`SELECT profile_mode FROM experts WHERE id = ${id}`;
         if (!existing) return reject('User not found.', 404);
         if (existing.profile_mode === 'named' && p.mode === 'anonymous' && form.get('confirm_anonymous') !== 'yes') throw new Error('Confirm that switching to anonymous permanently removes the stored name and email.');
-        await sql`UPDATE experts SET pseudonym = ${p.pseudonym}, profile_mode = ${p.mode}, name = ${p.name}, email = ${p.email} WHERE id = ${id}`;
+        const coverage = await readCoverage(form);
+        await sql.transaction([sql`UPDATE experts SET pseudonym = ${p.pseudonym}, profile_mode = ${p.mode}, name = ${p.name}, email = ${p.email}, region_slug = ${coverage[0].region} WHERE id = ${id}`, ...coverageQueries(sql, id, coverage)]);
         destination = `/admin/users/${id}`;
         break;
       }

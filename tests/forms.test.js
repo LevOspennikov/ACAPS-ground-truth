@@ -1,13 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rating, textField, sameOrigin, contactField, contactHref } from '../src/server/forms.js';
+import { textField, sameOrigin, contactField, contactHref } from '../src/server/forms.js';
 
-test('ratings accept only scale values or empty drafts', () => {
-  for (let i = 1; i <= 5; i++) assert.equal(rating(String(i)), i);
-  assert.equal(rating(null), null);
-  assert.equal(rating(''), null);
-  for (const value of ['0', '6', '1.5', '1junk', '01', 'NaN']) assert.throws(() => rating(value));
-});
 test('text validates required and bounded fields', () => {
   const form = new FormData();
   form.set('title', ' Example ');

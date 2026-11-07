@@ -42,7 +42,7 @@ if (authenticated && !loadError && !contact) return new Response("Contact not fo
                   </div>
                 ))}
               </dl>
-            ) : item.legacy ? <p class="answer-context">{item.legacy}</p> : <p>No answers received.</p>}
+            ) : <p>No answers received.</p>}
             {item.risk_id && <p><a href={`/admin/regions/${contact.region.slug}/answers?risk=${encodeURIComponent(item.risk_id)}`}>All answers for this risk</a></p>}
           </article>
         ))}

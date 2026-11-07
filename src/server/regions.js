@@ -1,20 +1,8 @@
 import { countrySlug, selectCountryRisk } from "../data/countries.js";
 import { randomUUID } from "node:crypto";
+import { db } from "./db.js";
+import { isUuid } from "./ids.js";
 import { describeAnswers } from "./answers.js";
-import { isAdmin } from "./auth.js";
-import { db, configured } from "./db.js";
-import { reject, sameOrigin } from "./forms.js";
-
-export function denyUnlessAdmin(request, cookies) {
-  if (!sameOrigin(request) || !configured() || !isAdmin(cookies)) return reject("Forbidden", 403);
-  return null;
-}
-
-const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-export function isUuid(value) {
-  return uuidPattern.test(value || "");
-}
 
 export function formatDate(value) {
   if (!value) return "";
@@ -43,31 +31,41 @@ export async function createRegion(name) {
   return { slug };
 }
 
-export async function regionBoard(slug, riskId = "") {
+export async function regionBoard(slug, riskId = "", { includeContacts = false } = {}) {
   const sql = db();
-  const [region] = await sql`SELECT slug, name FROM regions WHERE slug = ${slug}`;
-  if (!region) return null;
-  const reports = await sql`SELECT id, title, summary, published_on FROM reports WHERE region_slug = ${slug} ORDER BY published_on DESC, created_at DESC`;
-  const risks = await sql`SELECT * FROM risk_radar WHERE region_slug = ${slug} ORDER BY risk_id`;
-  const selectedRisk = selectCountryRisk(risks, slug, riskId);
-  const questionnaires = selectedRisk ? await sql`SELECT id, title, created_at, sent_at FROM questionnaires
-    WHERE region_slug = ${slug} AND risk_id = ${selectedRisk.risk_id} ORDER BY created_at DESC` : [];
-  const unlinked = await sql`SELECT id, title FROM questionnaires WHERE (region_slug = ${slug} OR region_slug IS NULL) AND risk_id IS NULL ORDER BY created_at DESC`;
-  const contacts = await sql`SELECT e.id, e.pseudonym AS name, e.focus,
+  // Neon sends the lazy queries together in one HTTP request. Resolve the
+  // selected risk in SQL too, so questionnaires need no second round trip.
+  const queries = [
+    sql`SELECT slug, name FROM regions WHERE slug = ${slug}`,
+    sql`SELECT * FROM risk_radar WHERE region_slug = ${slug} ORDER BY risk_id`,
+    sql`SELECT id, title, created_at, sent_at FROM questionnaires
+      WHERE region_slug = ${slug} AND risk_id = (
+        SELECT risk_id FROM risk_radar WHERE region_slug = ${slug}
+          AND (${riskId} = '' OR risk_id = ${riskId})
+        ORDER BY risk_id LIMIT 1
+      ) ORDER BY created_at DESC`,
+  ];
+  // Only the country page renders contacts.
+  if (includeContacts) queries.push(sql`SELECT e.id, e.pseudonym AS name, e.focus,
     count(q.id)::int AS invited,
-    count(a.id) FILTER (WHERE q.id IS NOT NULL AND (ans.assignment_id IS NOT NULL OR r.submitted_at IS NOT NULL))::int AS joined
-    FROM experts e
+    count(a.id) FILTER (WHERE q.id IS NOT NULL AND r.submitted_at IS NOT NULL)::int AS joined
+    FROM experts e JOIN expert_countries ec ON ec.expert_id = e.id
     LEFT JOIN assignments a ON a.expert_id = e.id
     LEFT JOIN questionnaires q ON q.id = a.questionnaire_id AND q.region_slug = ${slug}
-    LEFT JOIN questionnaire_answers ans ON ans.assignment_id = a.id
     LEFT JOIN responses r ON r.assignment_id = a.id
-    WHERE e.region_slug = ${slug}
+    WHERE ec.region_slug = ${slug}
     GROUP BY e.id
-    ORDER BY e.pseudonym`;
+    ORDER BY e.pseudonym`);
+  // Keep the risk list and its default selection consistent during edits.
+  const [[region], risks, questionnaires, contacts = []] = await sql.transaction(queries, {
+    readOnly: true,
+    isolationLevel: 'RepeatableRead',
+  });
+  if (!region) return null;
+  const selectedRisk = selectCountryRisk(risks, slug, riskId);
   return {
     ...region,
-    risks, selectedRisk, unlinked,
-    reports: reports.map((report) => ({ ...report, date: formatDate(report.published_on) })),
+    risks, selectedRisk,
     questionnaires: questionnaires.map((item) => ({ id: item.id, topic: item.title, opened: formatDate(item.created_at), sent: item.sent_at ? formatDate(item.sent_at) : "" })),
     contacts: contacts.map((item) => ({ ...item, contact: item.focus || "" })),
   };
@@ -97,7 +95,10 @@ export async function createContact(slug, name, contact) {
   const [region] = await sql`SELECT slug FROM regions WHERE slug = ${slug}`;
   if (!region) return null;
   const id = randomUUID();
-  await sql`INSERT INTO experts (id, pseudonym, region_slug, focus) VALUES (${id}, ${name}, ${slug}, ${contact})`;
+  await sql.transaction([
+    sql`INSERT INTO experts (id, pseudonym, region_slug, focus) VALUES (${id}, ${name}, ${slug}, ${contact})`,
+    sql`INSERT INTO expert_countries (expert_id, region_slug) VALUES (${id}, ${slug})`,
+  ]);
   return id;
 }
 
@@ -106,26 +107,20 @@ export async function contactPage(slug, id) {
   const sql = db();
   const [contact] = await sql`SELECT e.id, e.pseudonym AS name, e.focus, g.slug, g.name AS region_name,
     count(q.id)::int AS invited,
-    count(a.id) FILTER (WHERE q.id IS NOT NULL AND (ans.assignment_id IS NOT NULL OR r.submitted_at IS NOT NULL))::int AS joined
+    count(a.id) FILTER (WHERE q.id IS NOT NULL AND r.submitted_at IS NOT NULL)::int AS joined
     FROM experts e
-    JOIN regions g ON g.slug = e.region_slug
+    JOIN expert_countries ec ON ec.expert_id = e.id JOIN regions g ON g.slug = ec.region_slug
     LEFT JOIN assignments a ON a.expert_id = e.id
     LEFT JOIN questionnaires q ON q.id = a.questionnaire_id AND q.region_slug = ${slug}
-    LEFT JOIN questionnaire_answers ans ON ans.assignment_id = a.id
     LEFT JOIN responses r ON r.assignment_id = a.id
-    WHERE e.id = ${id}::uuid AND e.region_slug = ${slug}
+    WHERE e.id = ${id}::uuid AND ec.region_slug = ${slug}
     GROUP BY e.id, g.slug, g.name`;
   if (!contact) return null;
   const answers = await sql`SELECT q.title AS topic, q.risk_id, COALESCE(r.submitted_at, q.sent_at, a.created_at) AS happened,
-    COALESCE(
-      CASE WHEN jsonb_typeof(q.questions) = 'array' AND jsonb_array_length(q.questions) > 0 THEN q.questions ELSE NULL END,
-      (SELECT jsonb_agg(jsonb_build_object('id', qs.id, 'type', qs.type, 'prompt', qs.prompt, 'options', qs.options) ORDER BY qs.position) FROM questions qs WHERE qs.questionnaire_id = q.id)
-    ) AS questions,
-    r.answers, r.submitted_at, ans.answer AS legacy_answer
+    q.questions AS questions, r.answers, r.submitted_at
     FROM assignments a
     JOIN questionnaires q ON q.id = a.questionnaire_id
     LEFT JOIN responses r ON r.assignment_id = a.id
-    LEFT JOIN questionnaire_answers ans ON ans.assignment_id = a.id
     WHERE a.expert_id = ${id}::uuid AND q.region_slug = ${slug}
     ORDER BY happened DESC`;
   return {
@@ -141,7 +136,6 @@ export async function contactPage(slug, id) {
       date: formatDate(item.happened),
       submitted: Boolean(item.submitted_at),
       lines: describeAnswers(item.questions, item.answers),
-      legacy: item.legacy_answer || "",
     })),
   };
 }
@@ -154,11 +148,7 @@ export async function riskAnswers(slug, riskId) {
     WHERE r.region_slug = ${slug} AND r.risk_id = ${riskId}`;
   if (!risk) return null;
   const rows = await sql`SELECT q.id AS questionnaire_id, q.title AS topic, q.created_at,
-    e.pseudonym AS expert, r.answers, r.submitted_at,
-    COALESCE(
-      CASE WHEN jsonb_typeof(q.questions) = 'array' AND jsonb_array_length(q.questions) > 0 THEN q.questions ELSE NULL END,
-      (SELECT jsonb_agg(jsonb_build_object('id', qs.id, 'type', qs.type, 'prompt', qs.prompt, 'options', qs.options) ORDER BY qs.position) FROM questions qs WHERE qs.questionnaire_id = q.id)
-    ) AS questions
+    e.pseudonym AS expert, r.answers, r.submitted_at, q.questions AS questions
     FROM questionnaires q
     LEFT JOIN assignments a ON a.questionnaire_id = q.id
     LEFT JOIN experts e ON e.id = a.expert_id
@@ -212,10 +202,9 @@ export async function editorPage(slug, id) {
   if (!isUuid(id)) return null;
   const sql = db();
   const [region] = await sql`SELECT slug, name FROM regions WHERE slug = ${slug}`;
-  const [questionnaire] = await sql`SELECT q.id, q.title, q.created_at, q.sent_at, q.risk_id, r.risk_title FROM questionnaires q LEFT JOIN risk_radar r ON r.risk_id = q.risk_id WHERE q.id = ${id}::uuid AND q.region_slug = ${slug}`;
+  const [questionnaire] = await sql`SELECT q.id, q.title, q.created_at, q.sent_at, q.risk_id, q.questions, r.risk_title FROM questionnaires q LEFT JOIN risk_radar r ON r.risk_id = q.risk_id WHERE q.id = ${id}::uuid AND q.region_slug = ${slug}`;
   if (!region || !questionnaire) return null;
-  const questions = await sql`SELECT id, type, prompt, options, placeholder FROM questions WHERE questionnaire_id = ${id}::uuid ORDER BY position`;
-  const [{ count }] = await sql`SELECT count(*)::int AS count FROM experts WHERE region_slug = ${slug}`;
+  const [{ count }] = await sql`SELECT count(*)::int AS count FROM expert_countries ec JOIN experts e ON e.id = ec.expert_id WHERE ec.region_slug = ${slug} AND e.active = true`;
   return {
     region,
     contacts: count,
@@ -226,10 +215,7 @@ export async function editorPage(slug, id) {
       risk_title: questionnaire.risk_title,
       opened: formatDate(questionnaire.created_at),
       sent: questionnaire.sent_at ? formatDate(questionnaire.sent_at) : "",
-      questions: questions.map((question) => ({
-        ...question,
-        options: question.options ? question.options.split("\n").filter(Boolean) : [],
-      })),
+      questions: questionnaire.questions || [],
     },
   };
 }
@@ -245,11 +231,16 @@ export async function addQuestion(slug, questionnaireId, question) {
   const item = await openQuestionnaire(sql, slug, questionnaireId);
   if (!item || item.sent_at) return null;
   const id = randomUUID();
-  await sql`INSERT INTO questions (id, questionnaire_id, position, type, prompt, options, placeholder)
-    VALUES (${id}, ${questionnaireId}::uuid,
-      (SELECT COALESCE(MAX(position), 0) + 1 FROM questions WHERE questionnaire_id = ${questionnaireId}::uuid),
-      ${question.type}, ${question.prompt}, ${question.options}, ${question.placeholder})`;
-  return id;
+  const entry = {
+    id,
+    type: question.type,
+    prompt: question.prompt,
+    options: question.type === 'single' ? question.options : [],
+    placeholder: question.type === 'text' ? question.placeholder : '',
+  };
+  const [added] = await sql`UPDATE questionnaires SET questions = questions || ${JSON.stringify([entry])}::jsonb
+    WHERE id = ${questionnaireId}::uuid AND region_slug = ${slug} AND sent_at IS NULL RETURNING id`;
+  return added ? id : null;
 }
 
 export async function removeQuestion(slug, questionnaireId, questionId) {
@@ -257,23 +248,10 @@ export async function removeQuestion(slug, questionnaireId, questionId) {
   const sql = db();
   const item = await openQuestionnaire(sql, slug, questionnaireId);
   if (!item || item.sent_at) return null;
-  const removed = await sql`DELETE FROM questions WHERE id = ${questionId}::uuid AND questionnaire_id = ${questionnaireId}::uuid RETURNING id`;
-  return removed.length ? item : null;
-}
-
-export async function sendQuestionnaire(slug, questionnaireId) {
-  const sql = db();
-  const item = await openQuestionnaire(sql, slug, questionnaireId);
-  if (!item || item.sent_at) return null;
-  const questionRows = await sql`SELECT id, type, prompt, options, placeholder FROM questions WHERE questionnaire_id = ${questionnaireId}::uuid ORDER BY position`;
-  if (!questionRows.length) return { error: "questions" };
-  const experts = await sql`SELECT id FROM experts WHERE region_slug = ${slug} AND active = true`;
-  if (!experts.length) return { error: "contacts" };
-  const snapshot = questionRows.map((question) => ({ ...question, options: question.type === "single" ? question.options.split("\n").filter(Boolean) : [] }));
-  const inserts = experts.map((expert) => sql`INSERT INTO assignments (id, questionnaire_id, expert_id) VALUES (${randomUUID()}, ${questionnaireId}::uuid, ${expert.id}) ON CONFLICT (questionnaire_id, expert_id) DO NOTHING`);
-  await sql.transaction([
-    ...inserts,
-    sql`UPDATE questionnaires SET sent_at = now(), questions = ${JSON.stringify(snapshot)}::jsonb WHERE id = ${questionnaireId}::uuid AND sent_at IS NULL`,
-  ]);
-  return { recipients: experts.length };
+  const [removed] = await sql`UPDATE questionnaires SET questions = COALESCE((
+    SELECT jsonb_agg(element ORDER BY ordinality)
+    FROM jsonb_array_elements(questionnaires.questions) WITH ORDINALITY AS t(element, ordinality)
+    WHERE element->>'id' <> ${questionId}
+  ), '[]'::jsonb) WHERE id = ${questionnaireId}::uuid AND region_slug = ${slug} AND sent_at IS NULL RETURNING id`;
+  return removed ? item : null;
 }

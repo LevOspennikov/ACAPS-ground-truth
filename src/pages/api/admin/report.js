@@ -1,5 +1,6 @@
 import { redirect, reject, textField } from "../../../server/forms.js";
-import { createReport, denyUnlessAdmin } from "../../../server/regions.js";
+import { createReport } from "../../../server/regions.js";
+import { denyUnlessAdmin } from "../../../server/auth.js";
 
 export async function POST({ request, cookies }) {
   const denied = denyUnlessAdmin(request, cookies);

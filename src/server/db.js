@@ -5,8 +5,3 @@ export function db() {
   if (!configured()) throw new Error('Application environment is not configured.');
   return neon(connectionString());
 }
-
-export async function databaseVersion() {
-  const [response] = await db()`SELECT version()`;
-  return response.version;
-}
