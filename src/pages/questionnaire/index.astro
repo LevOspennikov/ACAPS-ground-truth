@@ -11,6 +11,7 @@ import {
   answerLabel
 } from '../../server/answers.js';
 import ExpertResults from '../../components/ExpertResults.astro';
+import ExpertRoundResults from '../../components/ExpertRoundResults.astro';
 
 if (Astro.request.method === 'POST' && !sameOrigin(Astro.request)) {
   return reject('Forbidden', 403);
@@ -165,7 +166,7 @@ const question = questions[step];
 </head>
 
 <body>
-  <main class="expert-shell">
+  <main class:list={['expert-shell', { 'submitted-results': assignment?.round_two_submitted_at }]}>
 
     {!assignment ? (
       <>
@@ -191,23 +192,29 @@ const question = questions[step];
 
         <h1>{assignment.title}</h1>
 
-        <p>{assignment.description}</p>
+        {!assignment.round_two_submitted_at && <p>{assignment.description}</p>}
 
-        <p class="muted">
+        {!assignment.round_two_submitted_at && <p class="muted">
           {assignment.profile_mode === 'anonymous'
             ? 'Anonymous profile: no name or email is stored.'
             : 'Named profile: your name and email are visible only to admins.'}
           {' '}
           Answers are never publicly attributed.
           Avoid identifying details in free text.
-        </p>
+        </p>}
 
         {assignment.submitted_at ? (
           <>
+            {assignment.round_two_submitted_at ? <ExpertRoundResults
+              questions={questions}
+              originalAnswers={answers}
+              answers={assignment.round_two_answers || {}}
+              startedAt={assignment.round_two_started_at}
+            /> : <>
             <section class="notice" role="status">
               <h2>Thank you. Your response is submitted.</h2>
 
-              {assignment.round_two_started_at ? <p>Your Round 1 answers are saved and locked. {assignment.round_two_submitted_at ? 'Your Round 2 submission is available below.' : 'Use the link below to continue your reassessment.'}</p> : <p>
+              {assignment.round_two_started_at ? <p>Your Round 1 answers are saved and locked. Use the link below to continue your reassessment.</p> : <p>
                 Your answers are saved on the server and cannot
                 be edited. Return through your invitation in
                 this browser within seven days to see the latest
@@ -240,10 +247,11 @@ const question = questions[step];
                   href="/round-two"
                   class="round-two-link"
                 >
-                  {assignment.round_two_submitted_at ? 'View your Round 2 results →' : 'Continue to Round 2 →'}
+                  Continue to Round 2 →
                 </a>
               </div>
             </section>}
+            </>}
 
           </>
         ) : (

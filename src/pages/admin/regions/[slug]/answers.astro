@@ -30,7 +30,7 @@ if (authenticated && !loadError && !page) return new Response("Risk not found", 
         {page.questionnaires.map((questionnaire) => (
           <article class="card">
             <h3>{questionnaire.topic}</h3>
-            <p><a href={`/admin/results/${questionnaire.id}`}>Results and rounds →</a></p>
+            <p><a href={`/admin/regions/${page.region.slug}/questionnaires/${questionnaire.id}`}>Manage questionnaire →</a></p>
             <p class="muted">{questionnaire.submitted} submitted of {questionnaire.invited} invited</p>
             {!questionnaire.questions.length && <p>No answers received.</p>}
             {questionnaire.questions.map((question) => {

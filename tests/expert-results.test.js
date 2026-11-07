@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { expertDistributions, expertResults, resultsMinimum } from '../src/server/expert-results.js';
 import { hash, invitationMatchesSession } from '../src/server/auth.js';
-import { resultsMarkup } from '../src/lib/expert-results-view.js';
+import { resultsMarkup, majoritySummary } from '../src/lib/expert-results-view.js';
 
 const questions = [
   { id: 'q1', type: 'single', prompt: 'Risk?', options: ['Low', 'Medium', 'High'], privateMetadata: 'PRIVATE' },
@@ -102,4 +102,15 @@ test('return links require an existing matching session and do not return creden
   }), true);
   assert.deepEqual(parameters, [hash('session'), hash(invitation)]);
   assert.equal(await invitationMatchesSession(cookies('unrelated-or-expired-session'), invitation, () => async () => []), false);
+});
+
+test('feedback distinguishes an absolute majority, a leading option and tied responses', () => {
+  const result = (counts) => ({ total: counts.reduce((a, b) => a + b, 0), options: counts.map((count, i) => ({ label: ['A', 'B', 'C'][i], count, percent: Math.round(count / counts.reduce((a, b) => a + b, 0) * 100) })) });
+  assert.equal(majoritySummary(result([3, 2])), 'Majority: A (3 of 5, 60%).');
+  assert.equal(majoritySummary(result([4, 3, 3])), 'Most common: A (4 of 10, 40%). No option has a majority.');
+  assert.equal(majoritySummary(result([2, 1, 1])), 'Most common: A (2 of 4, 50%). No option has a majority.');
+  assert.equal(majoritySummary(result([2, 2])), 'Responses are tied. No option has a majority.');
+  assert.equal(majoritySummary({ ...result([3, 2]), withheld: true }), null);
+  assert.equal(majoritySummary({ total: 0, options: [] }), null);
+  assert.equal(majoritySummary(null), null);
 });
