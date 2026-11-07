@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pieSegments, chartPalette } from '../src/server/charts.js';
+import { pieSegments, chartPalette, chartColor } from '../src/server/charts.js';
 
 const question = { id: 'q1', type: 'single', prompt: 'Risk?', options: ['Low', 'Medium', 'High'] };
 
@@ -45,4 +45,11 @@ test('colors cycle when there are more options than palette entries', () => {
   const chart = pieSegments(many, distributions);
   assert.equal(chart.segments[0].color, chartPalette[0]);
   assert.equal(chart.segments[chartPalette.length].color, chartPalette[0]);
+});
+
+test('chartColor maps an option index to the same colour as its pie slice', () => {
+  assert.equal(chartColor(0), chartPalette[0]);
+  assert.equal(chartColor(3), chartPalette[3]);
+  assert.equal(chartColor(chartPalette.length), chartPalette[0]);
+  assert.equal(pieSegments(question, [{ question_id: 'q1', answer: 'q1-1', total: 1 }]).segments[0].color, chartColor(1));
 });

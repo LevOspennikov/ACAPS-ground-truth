@@ -9,6 +9,12 @@ export const chartPalette = [
   '#c9a227',
 ];
 
+// Single source of truth for mapping an option index to its chart colour, so
+// answer swatches always match the slice they belong to.
+export function chartColor(index, palette = chartPalette) {
+  return palette[index % palette.length];
+}
+
 // Build donut-chart segments for a single-choice question from its per-option
 // counts. Returns stroke-based SVG geometry the page can render without any
 // client JavaScript.
@@ -35,7 +41,7 @@ export function pieSegments(question, distributions, palette = chartPalette) {
         label: c.label,
         count: c.count,
         percent: Math.round(fraction * 100),
-        color: palette[i % palette.length],
+        color: chartColor(i, palette),
         dasharray: `${length.toFixed(3)} ${(circumference - length).toFixed(3)}`,
         dashoffset: (-cumulative * circumference).toFixed(3),
       });
