@@ -188,11 +188,23 @@ export async function riskAnswers(slug, riskId) {
   };
 }
 
-export async function createQuestionnaire(slug, topic, riskId) {
+export async function countryRisk(slug, riskId) {
+  const [risk] = await db()`SELECT * FROM risk_radar WHERE region_slug = ${slug} AND risk_id = ${riskId}`;
+  return risk || null;
+}
+
+export async function createQuestionnaire(slug, topic, riskId, questions = []) {
   const sql = db();
   const id = randomUUID();
-  const [created] = await sql`INSERT INTO questionnaires (id, title, context, region_slug, risk_id)
-    SELECT ${id}, ${topic}, r.rationale, r.region_slug, r.risk_id FROM risk_radar r
+  const stored = JSON.stringify(questions.map((question) => ({
+    id: randomUUID(),
+    type: question.type,
+    prompt: question.prompt,
+    options: question.type === "single" ? question.options : [],
+    placeholder: question.placeholder || "",
+  })));
+  const [created] = await sql`INSERT INTO questionnaires (id, title, context, region_slug, risk_id, questions)
+    SELECT ${id}, ${topic}, r.rationale, r.region_slug, r.risk_id, ${stored}::jsonb FROM risk_radar r
     WHERE r.risk_id = ${riskId} AND r.region_slug = ${slug} RETURNING id`;
   if (!created) return null;
   return id;

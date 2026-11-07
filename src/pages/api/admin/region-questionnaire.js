@@ -1,22 +1,31 @@
 import { redirect, reject, textField } from "../../../server/forms.js";
-import { createQuestionnaire } from "../../../server/regions.js";
+import { countryRisk, createQuestionnaire } from "../../../server/regions.js";
 import { denyUnlessAdmin } from "../../../server/auth.js";
+import { generateRiskQuestions } from "../../../server/green-pt.js";
 
 export async function POST({ request, cookies }) {
   const denied = denyUnlessAdmin(request, cookies);
   if (denied) return denied;
   const form = await request.formData();
   let region;
-  let topic;
-  let risk;
+  let riskId;
   try {
     region = textField(form, "region", 80, true);
-    topic = textField(form, "topic", 180, true);
-    risk = textField(form, "risk", 40, true);
+    riskId = textField(form, "risk", 40, true);
   } catch {
-    return reject("A topic and a selected risk are required.");
+    return reject("A selected risk is required.");
   }
-  const id = await createQuestionnaire(region, topic, risk);
-  if (!id) return reject("Risk not found in the selected country", 404);
+  const risk = await countryRisk(region, riskId);
+  if (!risk) return reject("Risk not found in the selected country", 404);
+  const back = `/admin/regions/${region}?${new URLSearchParams({ risk: riskId, error: "generate" })}`;
+  let questions;
+  try {
+    questions = await generateRiskQuestions(risk);
+  } catch (error) {
+    const code = error.message === "key" ? "key" : "generate";
+    return redirect(`/admin/regions/${region}?${new URLSearchParams({ risk: riskId, error: code })}`);
+  }
+  const id = await createQuestionnaire(region, String(risk.risk_title).slice(0, 180), riskId, questions);
+  if (!id) return redirect(back);
   return redirect(`/admin/regions/${region}/questionnaires/${id}`);
 }
