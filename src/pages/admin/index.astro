@@ -30,7 +30,7 @@ if (authenticated) {
   <AdminAccess ready={ready} authenticated={authenticated}>
     <div class="row"><div><p class="eyebrow">ACAPS GROUND TRUTH</p><h1>Country risks</h1></div></div>
     {failed ? <p class="notice error" role="alert">Country risk data could not be loaded. Apply the updated database schema and seed, then retry.</p> : <>
-      <form class="search" method="get"><label for="q">Search countries</label><input id="q" name="q" value={search} maxlength="80" /><button>Search</button><a href="/admin">Clear</a></form>
+      <form class="search" method="get"><label for="q">Search countries</label><input id="q" name="q" value={search} maxlength="80" /><button>Search</button><a class="button secondary search-clear" href="/admin">Clear</a></form>
       <nav id="country-selection" class="region-grid" aria-label="Countries">{regions.map((r) => <a class="region-link" aria-current={selected?.slug === r.slug ? 'page' : undefined} href={`/admin?country=${encodeURIComponent(r.slug)}`}>{r.name} · {r.risks} risks</a>)}</nav>
       {!regions.length && <p class="notice">No countries found.</p>}
       <div id="country-risk-panel">
