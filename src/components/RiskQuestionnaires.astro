@@ -8,7 +8,9 @@ const current = region.questionnaires.filter((item) => !item.sent);
 const sent = region.questionnaires.filter((item) => item.sent);
 const summaryFields = riskRadarSummaryKeys.filter((key) => key !== "country").map((key) => riskRadarFields.find((field) => field.key === key));
 const primaryRiskKeys = ["risk_type", "status", "probability", "risk_level", "risk_trend", "intensity_of_hazard", "impact"];
-const primaryFields = primaryRiskKeys.map((key) => riskRadarFields.find((field) => field.key === key));
+const ratingKeys = ["risk_type", "status", "probability", "risk_level", "risk_trend"];
+const ratingFields = ratingKeys.map((key) => riskRadarFields.find((field) => field.key === key));
+const detailFields = riskRadarFields.filter((field) => !["risk_id", "risk_title", "country", "iso", ...ratingKeys].includes(field.key));
 const additionalFields = riskRadarFields.filter((field) => !["risk_id", "risk_title", "country", "iso", ...primaryRiskKeys].includes(field.key));
 const shortRiskTitle = (title) => title.length > 40 ? `${title.slice(0, 40).trimEnd()}…` : title;
 const generateError = Astro.url.searchParams.get("error");
@@ -58,20 +60,20 @@ const riskHref = (riskId) => links === "overview"
     <>
       <p class="eyebrow">{risk.risk_id} · {region.name}</p>
       <h2 id="risk-detail-heading">{risk.risk_title}</h2>
-      {compact ? <dl class="risk-fields risk-fields-primary">
-        {primaryFields.filter((field) => risk[field.key]).map((field) => (
+      {compact ? <dl class="risk-summary">
+        {ratingFields.filter((field) => risk[field.key]).map((field) => (
           <div>
             <dt>{field.label}</dt>
-            <dd class="answer-context">{risk[field.key] || "—"}</dd>
+            <dd>{risk[field.key]}</dd>
           </div>
         ))}
       </dl> : <dl class="risk-fields">
         {riskRadarFields.filter((field) => field.key !== "risk_id" && field.key !== "risk_title").map((field) => <div><dt>{field.label}</dt><dd class="answer-context">{risk[field.key] || "—"}</dd></div>)}
       </dl>}
       {compact && <details class="more-risk-details">
-        <summary>More risk details</summary>
+        <summary>Risk details</summary>
         <dl class="risk-fields">
-          {additionalFields.map((field) => (
+          {detailFields.map((field) => (
             <div>
               <dt>{field.label}</dt>
               <dd class="answer-context">{risk[field.key] || "—"}</dd>
