@@ -2,17 +2,24 @@ import { env } from 'node:process';
 
 const model = 'glm-5.3';
 const endpoint = 'https://api.greenpt.ai/v1/chat/completions';
-export const questionSystemPrompt = `You write a short questionnaire so humanitarian experts can judge one risk. They are not being tested on the brief.
+export const questionSystemPrompt = `Write a short, neutral questionnaire so humanitarian experts can assess one existing ACAPS risk. Experts contribute their contextual knowledge; they are not being tested on the brief.
 
-Each question asks for their judgment on one of these:
-- how they see the situation evolving over the coming months
-- how likely a concrete development named in this risk is
-- which humanitarian consequences, needs, or access constraints they consider most serious, and who is most affected
+Use only the supplied risk information to identify the development, places, affected groups, consequences, needs, and access constraints. Do not invent facts, groups, thresholds, dates, or sources. Do not repeat the existing ACAPS probability, impact, or risk-level rating in the question wording or options. Do not ask experts to recall report wording, dates, or sources.
 
-Spread the questions across those angles. Use the risk only to name the developments, places, and groups. Do not ask experts to recall dates, sources, or wording.
+Return exactly four multiple-choice questions, in this order:
 
-Reply with JSON only, no markdown: {"questions":[{"prompt":"...","options":["...","..."]}]}.
-Return 3, 4 or 5 questions. Each question needs 2 to 4 short options an expert can choose in one tap. For likelihood, use Unlikely, Possible, Likely, and Very likely. For how the situation evolves or which humanitarian risks they see, offer concrete alternatives drawn from this risk. Do not include a free-text question.`;
+1. Ask how well the risk description and listed triggers match the expert's understanding. Use these options: "Matches my understanding", "Partly matches", "Does not match", "Cannot assess".
+
+2. Ask how likely the clearest central development or trigger in this risk is to occur or worsen over the next six months. Ask about one development only; do not combine separate triggers. Use these options: "Very low", "Low", "Medium", "High", "Very high", "Cannot assess". Do not invent an exact closing date or resolution threshold.
+
+3. Ask what level of humanitarian impact is expected if that same development occurs. Keep this judgment separate from probability. Use these options: "1 - Very low", "2 - Low", "3 - Moderate", "4 - Significant", "5 - Major", "Cannot assess".
+
+4. Ask which expected humanitarian consequence, priority need, or access constraint should be monitored most closely. Offer up to four concise options drawn from the risk information, including who is affected when supplied. Add "Other / not listed" and "Cannot assess".
+
+Make the questions easy to answer in a few minutes on a phone. Keep each question focused and each option short and distinct. Do not generate a free-text question; the application adds "What did we miss?" automatically.
+
+Reply with valid JSON only, no markdown or extra keys: {"questions":[{"prompt":"...","options":["...","..."]}]}.
+Each prompt must be no more than 300 characters. Return exactly four questions. Each question must have 2 to 6 options, each no more than 180 characters.`;
 const briefFields = ['risk_id', 'risk_title', 'country', 'risk_type', 'status', 'probability', 'risk_level', 'risk_trend', 'rationale', 'triggers', 'expected_impact', 'expected_priority_needs', 'current_vulnerability'];
 
 // Server-only. Do not import into browser code or log the returned value.
