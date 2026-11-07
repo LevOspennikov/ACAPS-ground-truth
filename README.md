@@ -13,11 +13,16 @@ Built for Hackathon for Good #8, the project brings the full consultation workfl
 3. **Contribute at a convenient pace.** Experts open their link without a password, answer one question at a time, save progress on the server and return later. They review their answers before final submission and can add written context through “What did we miss?”
 4. **Review the group’s perspective.** Organisers see completion counts, answer distributions and submitted context. After submitting, experts can view aggregate choice results, giving them feedback while keeping their initial contribution independent.
 
+<img width="1102" height="846" alt="Screenshot 2026-11-07 at 17 17 56" src="https://github.com/user-attachments/assets/a8c5feec-c50a-4a2f-8e4d-016a0543c3dc" />
+
+
 ## Designed around experts
 
 The mobile-friendly interface uses short, focused forms and works with JavaScript disabled. The questionnaire page is especially lightweight, with a final page size of just **3.5 KB**, helping keep contributions accessible on slow connections. Server-saved progress supports returning to an unfinished response. AI assists the organiser with question drafting, while experts interact with a straightforward questionnaire.
 
 The application supports named profiles, whose names and email addresses are visible only to administrators, and anonymous profiles that store neither. Private invitation links expire after 48 hours and can be redeemed once to establish an assignment-specific session. Expert-facing group results contain aggregate choice answers, with a configurable minimum-response threshold for each question.
+
+<img width="461" height="753" alt="Screenshot 2026-11-07 at 17 19 52" src="https://github.com/user-attachments/assets/aba9a3b3-226d-4b43-8821-623e7c2032e1" />
 
 ## A practical foundation
 
