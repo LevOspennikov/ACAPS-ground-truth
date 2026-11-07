@@ -3,6 +3,8 @@ import { countryRisk, createQuestionnaire } from "../../../server/regions.js";
 import { denyUnlessAdmin } from "../../../server/auth.js";
 import { generateRiskQuestions } from "../../../server/green-pt.js";
 
+export const config = { maxDuration: 30 };
+
 export async function POST({ request, cookies }) {
   const denied = denyUnlessAdmin(request, cookies);
   if (denied) return denied;

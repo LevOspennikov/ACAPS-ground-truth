@@ -27,13 +27,46 @@ export function riskBrief(risk) {
   }).filter(Boolean).join('\n');
 }
 
+function jsonObjects(text) {
+  const objects = [];
+  for (let start = 0; start < text.length; start++) {
+    if (text[start] !== '{') continue;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let index = start; index < text.length; index++) {
+      const character = text[index];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (character === '\\') escaped = true;
+        else if (character === '"') inString = false;
+        continue;
+      }
+      if (character === '"') inString = true;
+      else if (character === '{') depth += 1;
+      else if (character === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          objects.push(text.slice(start, index + 1));
+          break;
+        }
+      }
+    }
+  }
+  return objects;
+}
+
 export function parseGeneratedQuestions(content) {
   const text = String(content || '').trim();
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  if (start < 0 || end <= start) throw new Error('generate');
-  const parsed = JSON.parse(text.slice(start, end + 1));
-  const items = Array.isArray(parsed.questions) ? parsed.questions : [];
+  let parsed = null;
+  for (const candidate of jsonObjects(text)) {
+    try {
+      const value = JSON.parse(candidate);
+      if (Array.isArray(value?.questions)) parsed = value;
+    } catch { /* A reasoning note can contain braces that are not the questionnaire. */ }
+  }
+  if (!parsed) throw new Error('generate');
+  const items = parsed.questions;
   const questions = [];
   for (const item of items) {
     const prompt = String(item?.prompt || '').trim().slice(0, 300);
@@ -64,6 +97,9 @@ export async function generateRiskQuestions(risk) {
         model,
         stream: false,
         temperature: 0.4,
+        reasoning_effort: 'none',
+        response_format: { type: 'json_object' },
+        max_tokens: 900,
         messages: [
           { role: 'system', content: questionSystemPrompt },
           { role: 'user', content: riskBrief(risk) },
@@ -76,5 +112,6 @@ export async function generateRiskQuestions(risk) {
   }
   if (!response.ok) throw new Error('generate');
   const body = await response.json();
-  return parseGeneratedQuestions(body?.choices?.[0]?.message?.content);
+  const message = body?.choices?.[0]?.message || {};
+  return parseGeneratedQuestions(message.content || message.reasoning_content);
 }
