@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseGeneratedQuestions, riskBrief } from '../src/server/green-pt.js';
+import { parseGeneratedQuestions, questionSystemPrompt, riskBrief } from '../src/server/green-pt.js';
 
 test('generated questions stay between three and five and end with the free-text prompt', () => {
   const content = JSON.stringify({ questions: [
@@ -22,6 +22,12 @@ test('generated questions stay between three and five and end with the free-text
   assert.throws(() => parseGeneratedQuestions('{"questions":[{"prompt":"Only one","options":["A","B"]}]}'));
 });
 
+test('the generation prompt asks for judgment, not recall', () => {
+  assert.match(questionSystemPrompt, /situation evolving/);
+  assert.match(questionSystemPrompt, /how likely/);
+  assert.match(questionSystemPrompt, /humanitarian consequences/);
+  assert.match(questionSystemPrompt, /Do not ask experts to recall/);
+});
 test('the model brief keeps the risk fields and drops blanks', () => {
   const brief = riskBrief({ risk_id: 'R1', risk_title: 'Flooding', country: 'Afghanistan', rationale: '', source: 'secret' });
   assert.match(brief, /risk_title: Flooding/);
