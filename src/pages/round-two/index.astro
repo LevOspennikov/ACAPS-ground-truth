@@ -143,8 +143,6 @@ if (assignment && Astro.request.method === 'POST') {
 
 const question = questions[step];
 const saved = Astro.url.searchParams.has('saved');
-const resultQuestion = questions.find((q) => q.id === Astro.url.searchParams.get('question')) || questions[0];
-const resultsHref = resultQuestion ? `/round-two?${new URLSearchParams({ question: resultQuestion.id })}` : '/round-two';
 ---
 
 <!doctype html>
@@ -189,24 +187,16 @@ const resultsHref = resultQuestion ? `/round-two?${new URLSearchParams({ questio
             <a href="/questionnaire">Back to your questionnaire</a>
           </section>
           <h2>Your Round 2 results</h2>
-          <form method="get" action="/round-two">
-            <label for="result-question">Question</label>
-            <select id="result-question" name="question">
-              {questions.map((q, index) => <option value={q.id} selected={q.id === resultQuestion?.id}>{index + 1}. {q.prompt}</option>)}
-            </select>
-            <button type="submit">View results</button>
-          </form>
-          {resultQuestion && <>
-            <section class="result-card">
-              <h3>{resultQuestion.prompt}</h3>
-              <p><strong>Your Round 1 answer:</strong> {answerLabel(resultQuestion, originalAnswers[resultQuestion.id])}</p>
-              <p><strong>Your Round 2 answer:</strong> {answerLabel(resultQuestion, answers[resultQuestion.id])}</p>
-            </section>
-            {resultQuestion.type === 'single' ? <>
-              <ExpertResults questionId={resultQuestion.id} roundTwo={true} refreshHref={resultsHref} />
-              <ExpertResults questionId={resultQuestion.id} frozen={true} refreshHref={resultsHref} />
+          <p><a href="/round-two">Refresh all results</a></p>
+          {questions.map((q, index) => <section class="result-card" aria-labelledby={`result-${q.id}`}>
+            <h2 id={`result-${q.id}`}>Question {index + 1}: {q.prompt}</h2>
+            <p class="answer-context"><strong>Your Round 1 answer:</strong> {answerLabel(q, originalAnswers[q.id])}</p>
+            <p class="answer-context"><strong>Your Round 2 answer:</strong> {answerLabel(q, answers[q.id])}</p>
+            {q.type === 'single' ? <>
+              <ExpertResults questionId={q.id} roundTwo={true} showRefresh={false} />
+              <ExpertResults questionId={q.id} frozen={true} showRefresh={false} />
             </> : <p>Written responses stay private. Group distributions are available for choice questions.</p>}
-          </>}
+          </section>)}
           </>
         ) : (
           <>
