@@ -4,6 +4,7 @@ import AdminAccess from "../../../../components/AdminAccess.astro";
 import { configured } from "../../../../server/db.js";
 import { isAdmin } from "../../../../server/auth.js";
 import { riskAnswers } from "../../../../server/regions.js";
+import { pieSegments } from "../../../../server/charts.js";
 
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
@@ -29,11 +30,13 @@ if (authenticated && !loadError && !page) return new Response("Risk not found", 
         {page.questionnaires.map((questionnaire) => (
           <article class="card">
             <h3>{questionnaire.topic}</h3>
-            <p class="muted">{questionnaire.replies.length} submitted of {questionnaire.invited} invited</p>
+            <p class="muted">{questionnaire.submitted} submitted of {questionnaire.invited} invited</p>
             {!questionnaire.questions.length && <p>No answers received.</p>}
-            {questionnaire.questions.map((question) => (
-              <section>
+            {questionnaire.questions.map((question) => {
+              const chart = question.type === 'single' ? pieSegments(question, questionnaire.distributions) : null;
+              return <section>
                 <h4>{question.prompt}</h4>
+                {chart && chart.total > 0 && <div class="donut"><svg viewBox={`0 0 ${chart.size} ${chart.size}`} role="img" aria-label={chart.segments.map((s) => `${s.label}: ${s.count} (${s.percent}%)`).join(', ')}>{chart.segments.map((s) => <circle cx={chart.center} cy={chart.center} r={chart.radius} fill="none" stroke={s.color} stroke-width={chart.width} stroke-dasharray={s.dasharray} stroke-dashoffset={s.dashoffset} transform={`rotate(-90 ${chart.center} ${chart.center})`} />)}</svg><dl class="legend">{chart.segments.map((s) => <div class="row"><dt><span class="swatch" style={`background:${s.color}`}></span>{s.label}</dt><dd>{s.count} · {s.percent}%</dd></div>)}</dl></div>}
                 <ul class="contacts">
                   {question.replies.map((reply) => (
                     <li>
@@ -42,8 +45,8 @@ if (authenticated && !loadError && !page) return new Response("Risk not found", 
                     </li>
                   ))}
                 </ul>
-              </section>
-            ))}
+              </section>;
+            })}
           </article>
         ))}
       </>

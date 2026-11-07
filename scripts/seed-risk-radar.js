@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { neon } from '@neondatabase/serverless';
 import { seedCountryRisks } from '../db/seed-risk-radar.js';
+import { seedDemoData } from '../db/seed-demo.js';
 
 // Production is bootstrapped explicitly at build time, never on a page GET.
 if (process.env.VERCEL === '1' && process.env.VERCEL_ENV === 'production') {
@@ -14,7 +15,9 @@ if (process.env.VERCEL === '1' && process.env.VERCEL_ENV === 'production') {
   const statements = [...baseSchema.split(';'), schema, ...links.split(';'), ...coverage.split(';')].map((s) => s.trim()).filter(Boolean);
   await sql.transaction(statements.map((s) => sql.query(s)));
   await seedCountryRisks(sql);
+  const demo = await seedDemoData(sql);
   console.log('Risk radar table ready; twelve CSV records and their country regions seeded without overwriting existing IDs.');
+  if (demo.seeded) console.log(`Seeded ${demo.experts} demo experts and one Afghanistan questionnaire with submitted responses.`);
 } else {
   console.log('Risk radar production import skipped for local/preview build. Use db:setup for a development database.');
 }

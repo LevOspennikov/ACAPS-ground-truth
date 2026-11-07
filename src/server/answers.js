@@ -30,21 +30,25 @@ function parseJson(value) {
   try { return JSON.parse(value); } catch { return null; }
 }
 
-function storedAnswers(stored) {
+export function parseQuestions(questions) {
+  const parsed = parseJson(questions);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+export function readAnswers(stored) {
   const parsed = parseJson(stored);
   return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
 }
 
-function questionOptions(question) {
+export function questionOptions(question) {
   if (Array.isArray(question.options)) return question.options;
   return String(question.options || '').split('\n').filter(Boolean);
 }
 
 // Turn a stored response into the prompts and chosen labels an admin can read.
 export function describeAnswers(questions, stored) {
-  const answers = storedAnswers(stored);
-  const parsedList = parseJson(questions);
-  const parsed = Array.isArray(parsedList) ? parsedList : [];
+  const answers = readAnswers(stored);
+  const parsed = parseQuestions(questions);
   if (!parsed.length) {
     return Object.entries(answers)
       .filter(([, value]) => String(value || '').trim())

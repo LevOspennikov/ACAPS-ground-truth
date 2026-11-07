@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build && node scripts/reset-db-on-deploy.js && node scripts/seed-risk-radar.js",
-    "db:setup": "node --env-file=.env scripts/setup-db.js",
+    "db:setup": "node --env-file=.env scripts/setup-db.js && node --env-file=.env scripts/seed-demo.js",
+    "db:seed-demo": "node --env-file=.env scripts/seed-demo.js",
     "test": "node --test"
   },
   "dependencies": {
