@@ -15,6 +15,13 @@ export function chartColor(index, palette = chartPalette) {
   return palette[index % palette.length];
 }
 
+// CSS class for a palette slot. Inline `style` attributes are blocked by the
+// production Content-Security-Policy, so swatches use these fixed classes
+// (defined in global.css) instead.
+export function chartColorClass(index) {
+  return `chart-color-${index % chartPalette.length}`;
+}
+
 // Build donut-chart segments for a single-choice question from its per-option
 // counts. Returns stroke-based SVG geometry the page can render without any
 // client JavaScript.
@@ -42,6 +49,7 @@ export function pieSegments(question, distributions, palette = chartPalette) {
         count: c.count,
         percent: Math.round(fraction * 100),
         color: chartColor(i, palette),
+        colorClass: chartColorClass(i),
         dasharray: `${length.toFixed(3)} ${(circumference - length).toFixed(3)}`,
         dashoffset: (-cumulative * circumference).toFixed(3),
       });
