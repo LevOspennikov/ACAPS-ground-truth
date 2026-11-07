@@ -2,6 +2,17 @@ import { env } from 'node:process';
 
 const model = 'glm-5.3';
 const endpoint = 'https://api.greenpt.ai/v1/chat/completions';
+export const questionSystemPrompt = `You write a short questionnaire so humanitarian experts can judge one risk. They are not being tested on the brief.
+
+Each question asks for their judgment on one of these:
+- how they see the situation evolving over the coming months
+- how likely a concrete development named in this risk is
+- which humanitarian consequences, needs, or access constraints they consider most serious, and who is most affected
+
+Spread the questions across those angles. Use the risk only to name the developments, places, and groups. Do not ask experts to recall dates, sources, or wording.
+
+Reply with JSON only, no markdown: {"questions":[{"prompt":"...","options":["...","..."]}]}.
+Return 3, 4 or 5 questions. Each question needs 2 to 4 short options an expert can choose in one tap. For likelihood, use Unlikely, Possible, Likely, and Very likely. For how the situation evolves or which humanitarian risks they see, offer concrete alternatives drawn from this risk. Do not include a free-text question.`;
 const briefFields = ['risk_id', 'risk_title', 'country', 'risk_type', 'status', 'probability', 'risk_level', 'risk_trend', 'rationale', 'triggers', 'expected_impact', 'expected_priority_needs', 'current_vulnerability'];
 
 // Server-only. Do not import into browser code or log the returned value.
@@ -54,7 +65,7 @@ export async function generateRiskQuestions(risk) {
         stream: false,
         temperature: 0.4,
         messages: [
-          { role: 'system', content: 'You write short expert-validation questions about one humanitarian risk. Reply with JSON only, no markdown: {"questions":[{"prompt":"...","options":["...","..."]}]}. Return 3, 4 or 5 questions. Each question needs 2 to 4 short answer options grounded in the risk. Do not include a free-text question.' },
+          { role: 'system', content: questionSystemPrompt },
           { role: 'user', content: riskBrief(risk) },
         ],
       }),
