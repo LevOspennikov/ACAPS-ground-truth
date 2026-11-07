@@ -17,7 +17,7 @@ Build a lightweight, mobile-friendly platform where trusted humanitarian experts
 ## Current product flow
 **Organiser/admin:** Sign in, select a country and risk, generate and review a questionnaire, edit single-choice or free-text questions, select experts with matching country/risk coverage, and generate invitation links. Questions lock after the first invitation. Review completion counts, submitted context, and answer distributions.
 
-**Expert:** Open an emailed or manually shared invitation, explicitly accept it, answer one question at a time, save progress on the server, review, and submit. Submission is final. A valid session resumes the assigned questionnaire and permits aggregate choice results only after submission.
+**Expert:** Open an emailed or manually shared invitation, explicitly accept it, answer one question at a time, save progress on the server, review, and submit. Submission is final. A valid session resumes the assigned questionnaire and permits aggregate choice results only after submission. During optional Round 2, show frozen Round 1 feedback for the current question; reveal updated Round 2 aggregates only after the expert submits Round 2, one selected question at a time.
 
 Profiles currently support admin-managed named and anonymous modes. Country/risk coverage determines eligibility for new assignments. An optional organiser-started Round 2 preserves original answers and uses frozen, question-specific choice feedback. Without an explicit start, the expert flow remains single-round. Expert-controlled privacy preferences, dedicated panels, additional consultation rounds, and forecast scoring remain development goals; distinguish them from existing behaviour.
 

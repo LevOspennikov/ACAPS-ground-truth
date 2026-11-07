@@ -143,6 +143,8 @@ if (assignment && Astro.request.method === 'POST') {
 
 const question = questions[step];
 const saved = Astro.url.searchParams.has('saved');
+const resultQuestion = questions.find((q) => q.id === Astro.url.searchParams.get('question')) || questions[0];
+const resultsHref = resultQuestion ? `/round-two?${new URLSearchParams({ question: resultQuestion.id })}` : '/round-two';
 ---
 
 <!doctype html>
@@ -178,16 +180,34 @@ const saved = Astro.url.searchParams.has('saved');
         </p>}
 
         {assignment.round_two_submitted_at ? (
-          <section class="notice" role="status">
+          <><section class="notice" role="status">
             <h2>Round 2 completed</h2>
             <p>
               Your revised answers have been submitted.
               Your original Round 1 answers remain preserved.
             </p>
             <a href="/questionnaire">Back to your questionnaire</a>
-            <h2>Your submitted Round 2 answers</h2>
-            {questions.map((q) => <section><h3>{q.prompt}</h3><p class="answer-context">{answerLabel(q, answers[q.id])}</p></section>)}
           </section>
+          <h2>Your Round 2 results</h2>
+          <form method="get" action="/round-two">
+            <label for="result-question">Question</label>
+            <select id="result-question" name="question">
+              {questions.map((q, index) => <option value={q.id} selected={q.id === resultQuestion?.id}>{index + 1}. {q.prompt}</option>)}
+            </select>
+            <button type="submit">View results</button>
+          </form>
+          {resultQuestion && <>
+            <section class="result-card">
+              <h3>{resultQuestion.prompt}</h3>
+              <p><strong>Your Round 1 answer:</strong> {answerLabel(resultQuestion, originalAnswers[resultQuestion.id])}</p>
+              <p><strong>Your Round 2 answer:</strong> {answerLabel(resultQuestion, answers[resultQuestion.id])}</p>
+            </section>
+            {resultQuestion.type === 'single' ? <>
+              <ExpertResults questionId={resultQuestion.id} roundTwo={true} refreshHref={resultsHref} />
+              <ExpertResults questionId={resultQuestion.id} frozen={true} refreshHref={resultsHref} />
+            </> : <p>Written responses stay private. Group distributions are available for choice questions.</p>}
+          </>}
+          </>
         ) : (
           <>
             <form method="post" action="/round-two">

@@ -37,6 +37,7 @@ test('Delphi opening, frozen feedback, authorization, progress and submission lo
       assert.equal(await roundTwoAssignment(session, getSql), null);
       assert.equal(await saveRoundTwoResponse(session, peer.id, peer.answers, 0, false, getSql), false);
       assert.equal(await results({ questionId: 'question-1', frozen: true }), null);
+      assert.equal(await results({ questionId: 'question-1', roundTwo: true }), null);
     });
 
     await t.test('empty or unanswered questionnaires cannot be opened', async () => {
@@ -49,6 +50,7 @@ test('Delphi opening, frozen feedback, authorization, progress and submission lo
     await t.test('opening captures only submitted choice aggregates and requires own Round 1 submission', async () => {
       assert.equal(await startRoundTwo(peer.questionnaire_id, getSql), true);
       assert.ok(await roundTwoAssignment(session, getSql));
+      assert.equal(await results({ questionId: 'question-1', roundTwo: true }), null);
       assert.equal(await roundTwoAssignment(lateSession, getSql), null);
       assert.equal(await saveRoundTwoResponse(lateSession, newcomer.id, peer.answers, 0, false, getSql), false);
       const [stored] = await sql`SELECT round_one_feedback FROM questionnaires WHERE id = ${peer.questionnaire_id}`;
@@ -82,6 +84,7 @@ test('Delphi opening, frozen feedback, authorization, progress and submission lo
       assert.equal(await saveRoundTwoResponse(session, newcomer.id, peer.answers, 0, false, getSql), false);
       assert.equal(await saveRoundTwoResponse(session, peer.id, peer.answers, 2, false, getSql), true);
       assert.equal((await roundTwoAssignment(session, getSql)).round_two_progress_step, 2);
+      assert.equal(await results({ questionId: 'question-1', roundTwo: true }), null);
       let report = await questionnaireResults(peer.questionnaire_id, getSql);
       assert.deepEqual(report.roundTwo, { eligible: 9, drafts: 1, submitted: 0 });
       assert.equal(await saveRoundTwoResponse(session, peer.id, peer.answers, 6, true, getSql), true);
@@ -92,13 +95,38 @@ test('Delphi opening, frozen feedback, authorization, progress and submission lo
       assert.deepEqual(report.roundTwo, { eligible: 9, drafts: 0, submitted: 1 });
     });
 
+    await t.test('submitted experts see live revised results for only the selected question, excluding drafts and free text', async () => {
+      let revised = await results({ questionId: 'question-1', roundTwo: true });
+      assert.deepEqual(revised.questions.map((q) => q.id), ['question-1']);
+      assert.equal(revised.questions[0].total, 1);
+      assert.equal(await results({ roundTwo: true }), null);
+      assert.equal(await results({ questionId: 'question-1', roundTwo: true, frozen: true }), null);
+      assert.deepEqual((await results({ questionId: 'foreign-id', roundTwo: true })).questions, []);
+      assert.deepEqual((await results({ questionId: 'question-6', roundTwo: true })).questions, []);
+      const lateAnswers = { ...peer.answers, 'question-1': 'question-1-0', 'question-6': 'PRIVATE REVISED CONTEXT' };
+      assert.equal(await saveRoundTwoResponse(lateSession, newcomer.id, lateAnswers, 3, false, getSql), true);
+      assert.equal(await expertResults(lateSession, { getSql, questionId: 'question-1', roundTwo: true }), null);
+      assert.equal((await results({ questionId: 'question-1', roundTwo: true })).questions[0].total, 1);
+      assert.equal(await saveRoundTwoResponse(lateSession, newcomer.id, lateAnswers, 6, true, getSql), true);
+      revised = await results({ questionId: 'question-1', roundTwo: true });
+      assert.equal(revised.questions[0].total, 2);
+      assert.ok(revised.questions[0].options[0].count >= 1);
+      assert.ok(!JSON.stringify(revised).includes('PRIVATE REVISED CONTEXT'));
+      const suppressed = await results({ questionId: 'question-1', roundTwo: true, minimum: '3' });
+      assert.deepEqual(Object.keys(suppressed.questions[0]).sort(), ['id', 'prompt', 'withheld']);
+      assert.equal(suppressed.questions[0].withheld, true);
+      assert.deepEqual(await results({ questionId: 'question-1', frozen: true }), initial);
+    });
+
     await t.test('expired or deactivated sessions cannot load, save or view feedback', async () => {
       await sql`UPDATE expert_sessions SET expires_at = now() - interval '1 minute' WHERE assignment_id = ${newcomer.id}`;
       assert.equal(await roundTwoAssignment(lateSession, getSql), null);
+      assert.equal(await expertResults(lateSession, { getSql, questionId: 'question-1', roundTwo: true }), null);
       await sql`UPDATE experts SET active = false WHERE id = ${peer.expert_id}`;
       assert.equal(await roundTwoAssignment(session, getSql), null);
       assert.equal(await saveRoundTwoResponse(session, peer.id, {}, 0, false, getSql), false);
       assert.equal(await results({ questionId: 'question-1', frozen: true }), null);
+      assert.equal(await results({ questionId: 'question-1', roundTwo: true }), null);
     });
   } finally { await database.close(); }
 });
