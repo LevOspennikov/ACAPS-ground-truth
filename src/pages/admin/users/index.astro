@@ -1,21 +1,36 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
-import CoverageFields from '../../../components/CoverageFields.astro';
-import { coverageOptions } from '../../../server/coverage.js';
-import UserFields from '../../../components/UserFields.astro';
+import UsersList from '../../../components/UsersList.astro';
 import { configured } from '../../../server/db.js';
 import { isAdmin } from '../../../server/auth.js';
 import { users } from '../../../server/management.js';
 if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
 const search = (Astro.url.searchParams.get('q') || '').slice(0, 150);
-let records = []; let countries = []; let failed = false;
-try { [records, countries] = await Promise.all([users(search), coverageOptions()]); } catch { failed = true; Astro.response.status = 503; }
+let records = []; let failed = false;
+try { records = await users(search); } catch { failed = true; Astro.response.status = 503; }
 ---
-<AdminLayout title="Users"><p class="eyebrow">EXPERT MANAGEMENT</p><h1>Users</h1><p>Keep named or anonymous profiles and invite each expert back to a specific questionnaire. Names and emails stay in admin.</p>
-  <form class="filter-form" method="get"><label for="search">Search pseudonym, name or email</label><input id="search" name="q" value={search} maxlength="150" /><button>Search</button><a href="/admin/users">Clear</a></form>
+<AdminLayout title="Users">
+  <div class="users-heading"><div><p class="eyebrow">EXPERT MANAGEMENT</p><h1>Users</h1></div><a class="button add-user" href="/admin/users/new"><span aria-hidden="true">+</span> Add user</a></div>
+  <p class="users-intro">Manage expert profiles, assignments and invitations. Names and emails stay in admin.</p>
+  <form class="users-search" method="get"><label for="search">Search users</label><div class="search-controls"><input id="search" name="q" type="search" value={search} maxlength="150" placeholder="Pseudonym, name or email" /><button class="secondary">Search</button>{search && <a href="/admin/users">Clear</a>}</div></form>
   {failed ? <p class="notice error" role="alert">Could not load users. Check the database setup and retry.</p> : <>
-    {!records.length && <p class="notice">No users found.</p>}
-    {records.map((user) => <article class="card"><div class="row"><h2><a href={`/admin/users/${user.id}`}>{user.pseudonym}</a></h2><span class="badge">{user.active ? 'Active' : 'Inactive'} · {user.profile_mode}</span></div>{user.profile_mode === 'named' && <p>{user.name || 'No name'}{user.email && <> · {user.email}</>}</p>}<p class={user.countries.length ? 'muted' : 'notice error'}>{user.countries.length ? user.countries.join(' · ') : 'Needs country assignment'}</p><p>{user.submitted} submitted / {user.assigned} assigned</p><a href={`/admin/users/${user.id}`}>Edit, assign & generate links →</a></article>)}
-    <form class="card" method="post" action="/api/admin/manage/user-create"><h2>Create user</h2><UserFields /><CoverageFields countries={countries} /><div class="actions"><button>Create user</button></div></form>
+    <p class="users-count">{records.length} {records.length === 1 ? 'user' : 'users'}{search && ' found'}</p>
+    {!records.length ? <p class="notice">{search ? 'No users match your search. Try another name or clear the search.' : 'No users yet. Add a user to start assigning questionnaires.'}</p> : <UsersList users={records} />}
   </>}
 </AdminLayout>
+
+<style>
+  .users-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+  .eyebrow { margin: 0 0 .3rem; color: #53675d; }
+  h1 { margin: 0; font-size: clamp(2rem, 5vw, 2.5rem); }
+  .add-user { display: inline-flex; align-items: center; gap: .45rem; flex: none; padding: .65rem 1rem; font-size: .9rem; }
+  .add-user span { font-size: 1.25rem; line-height: 1; }
+  .users-intro { margin: .8rem 0 1.5rem; color: #53675d; font-size: .9rem; }
+  .users-search { margin: 0 0 1rem; }
+  .users-search label { margin: 0 0 .35rem; font-size: .8rem; }
+  .search-controls { display: flex; align-items: center; gap: .6rem; }
+  .search-controls input { flex: 1; min-width: 0; padding: .65rem .8rem; font-size: .9rem; }
+  .search-controls button { padding: .65rem 1rem; font-size: .9rem; }
+  .search-controls a { font-size: .85rem; }
+  .users-count { margin: 1.25rem 0 .5rem; color: #53675d; font-size: .75rem; }
+</style>
