@@ -24,3 +24,11 @@
 @media(max-width:900px){.region-board{grid-template-columns:1fr}.region-board>section{width:100%}}
 .donut{display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap}.donut svg{width:7.5rem;height:7.5rem;flex:none}.legend{flex:1;min-width:14rem;margin:0}.legend .row{display:flex;justify-content:space-between;gap:1rem;padding:.5rem 0;border-top:1px solid #e4ebda}.legend .row:first-child{border-top:0}.legend dt{display:flex;align-items:center;font-weight:550}.swatch{display:inline-block;width:.85rem;height:.85rem;border-radius:50%;margin-right:.55rem;flex:none}
 .answer-swatch{display:inline-block;width:.75rem;height:.75rem;border-radius:2px;margin-right:.5rem;vertical-align:-0.1em}
+.chart-color-0{background:#235f47}
+.chart-color-1{background:#547d35}
+.chart-color-2{background:#d58936}
+.chart-color-3{background:#3a7ca5}
+.chart-color-4{background:#8f5aa8}
+.chart-color-5{background:#b0523a}
+.chart-color-6{background:#5f8a5f}
+.chart-color-7{background:#c9a227}
