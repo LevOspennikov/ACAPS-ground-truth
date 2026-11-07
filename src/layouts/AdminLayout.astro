@@ -1,8 +1,11 @@
 ---
 import Layout from './Layout.astro';
+import { invitationEmailMessages } from '../server/invitation-email.js';
 const { title = 'Admin' } = Astro.props;
 const invitation = Astro.cookies.get('new-invitation')?.value;
 if (invitation) Astro.cookies.delete('new-invitation', { path: '/admin' });
+const emailStatus = Astro.cookies.get('invitation-email-status')?.value;
+if (emailStatus) Astro.cookies.delete('invitation-email-status', { path: '/admin' });
 const reset = import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true';
 ---
 <Layout title={title}>
@@ -15,6 +18,6 @@ const reset = import.meta.env.RESET_DATABASE_ON_DEPLOY === 'true';
   </nav>
   {reset && <p class="notice error"><strong>Prototype: data resets on deployment.</strong> Every production deployment erases users, crises, assignments, invitations, sessions and answers. Return links work only until the next deployment.</p>}
   {Astro.url.searchParams.has('saved') && <p class="notice" role="status">Changes saved on the server.</p>}
-  {invitation && <section class="notice" aria-label="Generated invitation"><h2>Magic link ready — copy it now</h2><p>This link belongs to the selected user and questionnaire. It works once, expires in 48 hours, and replaces earlier unused links for this assignment. Existing valid sessions and answers are preserved.</p><a class="linkbox" href={`/invite?token=${invitation}`}>{Astro.url.origin}/invite?token={invitation}</a></section>}
+  {invitation && <section class="notice" aria-label="Generated invitation"><h2>Magic link ready — copy it now</h2><p role="status">{Object.hasOwn(invitationEmailMessages, emailStatus) ? invitationEmailMessages[emailStatus] : 'Share this link with the intended expert.'}</p><p>This link belongs to the selected user and questionnaire. It works once, expires in 48 hours, and replaces earlier unused links for this assignment. Existing valid sessions and answers are preserved.</p><a class="linkbox" href={`/invite?token=${invitation}`}>{Astro.url.origin}/invite?token={invitation}</a></section>}
   <slot />
 </Layout>

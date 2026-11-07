@@ -25,6 +25,33 @@ The homepage works without environment variables as a deployment smoke check. Da
 
 No Vercel CLI, Resend account, or separate backend host is needed for manual setup. `vercel.json` explicitly selects `npm run build` so the prototype database-reset hook runs when enabled. Frontend and backend code are separated within one deployment to keep this first setup small. Framework configuration follows the [Astro Vercel adapter documentation](https://docs.astro.build/en/guides/integrations-guide/vercel/).
 
+## Optional standalone email helper
+
+`src/server/email.js` exposes `sendEmail({ to, subject, text, html?, idempotencyKey? })` using native `fetch` and no SDK. It is server-only. Invitation generation uses it for active named profiles with an email address. Email configuration is optional for builds and normal app use; without it, admins can still generate and copy links. Automated tests mock all email sends.
+
+1. Obtain a sending API key through the [Resend Vercel Marketplace integration](https://vercel.com/marketplace/resend), which sets `RESEND_API_KEY` in your selected project, or create a key in the [Resend dashboard](https://resend.com/api-keys).
+2. Set `RESEND_API_KEY` and `EMAIL_FROM` in your local server environment (`.env` under Astro) or Vercel environment settings. Use `EMAIL_FROM="Ground Truth <onboarding@resend.dev>"` for testing. Keep both variables server-side, without a `PUBLIC_` prefix, and redeploy after changing Vercel variables.
+3. The [Resend test domain restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain) permits sending only to the email address associated with your Resend account. To reach arbitrary recipients, verify an owned domain and update `EMAIL_FROM` to an address on it. Check [Resend pricing](https://resend.com/pricing) for current free-tier quotas.
+
+Example for server code, after configuring the environment (calling this sends an email):
+
+```js
+import { sendEmail } from './src/server/email.js';
+
+const { id } = await sendEmail({
+  to: 'your-resend-account@example.org', // Replace with your account address.
+  subject: 'Ground Truth test',
+  text: 'This is a standalone email helper test.',
+  html: '<p>This is a standalone email helper test.</p>', // Optional.
+  idempotencyKey: 'ground-truth-test-unique-operation-id', // Optional; persist per send.
+});
+// id confirms provider acceptance, not inbox delivery.
+```
+
+Each call accepts one bare email address, a nonempty subject and plain-text body, plus optional HTML. Quoted local parts and display-name recipients are not supported. Idempotency keys must be 1–256 visible ASCII characters without spaces. The helper reads configuration at call time, times out after 10 seconds (including reading the response), and never retries automatically.
+
+Errors have sanitized messages and a stable `code`: `not_configured` for missing/unusable configuration, `invalid_input` for invalid arguments, `provider_rejected` for non-success HTTP responses, or `send_unconfirmed` for network failures, timeouts, or malformed success responses. An unconfirmed send may already have been accepted. For caller-initiated retries, reuse the same key and identical payload; [Resend retains idempotency keys for 24 hours](https://resend.com/docs/api-reference/emails/send-email). The helper never logs private data or attaches raw provider errors; callers must also avoid logging addresses, bodies or credentials.
+
 ## Reset on prototype deployments
 
 Set `RESET_DATABASE_ON_DEPLOY=true` in Vercel's **Production** environment to start each production deployment with empty application tables recreated from `db/schema.sql`. This deletes application records, including categories, crises, region data, questionnaires, synthetic experts, assignments, invitations, sessions, answers, and manually added risk radar records. The risk radar catalog is then reseeded with the twelve CSV records. Admin credentials remain in Vercel environment variables. Integration-managed tables and the database itself are preserved.
@@ -39,7 +66,7 @@ Local and Preview builds never trigger this reset. To stop deleting data, set `R
 2. In Crises, create a category, then a crisis with title, country and description. Categories can be renamed or archived and crises filtered by category/status.
 3. Open the crisis and create a questionnaire. Its questions are snapshotted from `src/data/questions.js`; these crisis questionnaires use the code template. Region questionnaires retain their existing question editor. Changing the code template never changes an existing questionnaire.
 4. In Users, create a named or anonymous synthetic profile. Every user has a pseudonym. Anonymous profiles must have empty name/email; the database enforces this. Converting a named profile requires clearing those fields and explicitly confirming removal.
-5. Open the user, assign the questionnaire, then generate a magic link. Copy it to another browser and accept it. Regenerating a link reuses the same assignment and invalidates older unused invitations without deleting answers or valid sessions.
+5. Open the user, assign the questionnaire, then generate a magic link. For named profiles with an email address, generation also attempts email delivery and shows the result. Anonymous profiles and named profiles without email use manual links. Copy the link to another browser and accept it. Regenerating a link reuses the same assignment and invalidates older unused invitations without deleting answers or valid sessions.
 6. Answer a question, save, and reload. Next/Back/Save all persist progress in Neon. A fresh invitation on another browser resumes that assignment, including its saved step. No offline storage or delivery is claimed.
 7. Finish the questions, review, and submit. Submission is final. Open results through the crisis to see single-choice counts and confidential submitted answers without user identities. Draft contents stay private.
 8. Deactivate a user to revoke all invitations/sessions and block access; reactivation requires a new link. Archive a crisis to stop new questionnaires/assignments while keeping existing expert access. Archiving a category removes it from new-crisis choices, without changing existing crises.
@@ -65,7 +92,9 @@ Add risks from the selected country's expandable form. The server fixes the coun
 
 Create/edit an expert in **Users** and select one or more countries. For each checked country, choose all-risk coverage or a nonempty set of that country's risks. Anonymous profiles use the same coverage settings without storing name or email. Existing users with no country show **Needs country assignment**. Existing region contacts are backfilled as all-risk members of their original country. Region contacts and Users share the same memberships.
 
-Open a country/risk questionnaire, add questions, then select recipients under **Recipients and invitation links**. The picker includes active experts with matching coverage and existing recipients. **Generate invitation links** creates assignments and 48-hour single-use links atomically; copy each link to its intended expert. Raw links are shown only in the authenticated POST response, never stored in plaintext. No email is sent automatically.
+Open a country/risk questionnaire, add questions, then select recipients under **Recipients and invitation links**. The picker includes active experts with matching coverage and existing recipients. **Generate invitation links** creates assignments and 48-hour single-use links atomically, then attempts an email for each active named profile with an email address. The user-detail **Generate magic link** action does the same. Anonymous profiles never trigger email. Raw links are shown in the authenticated admin response and sent to the intended named recipient, never stored in plaintext in the database. Copy links for recipients who need manual delivery.
+
+Each recipient has a separate email result: provider acceptance (not confirmed inbox delivery), skipped email, rejection, unavailable configuration, or an uncertain outcome. Email failure preserves the generated link, assignment and answers. Share the displayed link manually after a failure; generating again replaces the previous unused link and attempts a new email. There are no automatic retries or background sends. The resend.dev test sender can only reach your Resend account address; other recipients will be rejected until you configure a verified sender domain.
 
 Questions lock after the first invitation. Admins can later invite additional matching experts or regenerate links for previous recipients. Regeneration preserves assignments, drafts, submissions and valid sessions; older unused links are revoked. Changing country/risk coverage affects future assignments only: existing assignments and return links remain usable, even outside new coverage. Deactivation still blocks all access. Crisis-only questionnaires without country/risk retain the manual assignment path.
 
@@ -96,6 +125,6 @@ The Neon Vercel integration may provide `STORAGE_DATABASE_URL`; the app and sche
 
 Admin access uses one environment password and a signed eight-hour cookie. Expert links contain opaque random tokens, expire after 48 hours, and are redeemed once in an atomic database statement; only token hashes are stored in Neon. Redemption requires an explicit POST so automated link previews do not consume invitations. Expert sessions are scoped to one assignment, expire after seven days, and use HTTP-only, secure cookies on deployed builds. Mutations enforce same-origin requests and server authorization. Submitted answers are locked against concurrent edits. Token-bearing URLs should be excluded from any future analytics or request logging; the app sends strict-origin and no-store headers. The referrer policy strips paths and query strings while preserving the Origin header required by native form submissions; do not replace it with no-referrer, which makes browser form POSTs send Origin: null.
 
-Before handling real experts, add proper organiser accounts and login rate limiting, email delivery, expert-controlled privacy preferences, panels, configurable question editing, pagination for large admin lists, and aggregate suppression rules. Forms require connectivity and explicitly report server saves; there is no offline queue.
+Before handling real experts, add proper organiser accounts and login rate limiting, delivery tracking and queued email retries, expert-controlled privacy preferences, panels, configurable question editing, pagination for large admin lists, and aggregate suppression rules. Forms require connectivity and explicitly report server saves; there is no offline queue.
 
 The supplied root-level `risk-radar-export.csv` now provides the twelve-record risk catalog seed. Expert and questionnaire demonstrations still use synthetic personal details. `CLAUDE.md` and `docs/challenge-brief.md` were not present. No existing challenge data was modified.

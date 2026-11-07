@@ -103,8 +103,9 @@ export async function POST({ request, cookies, params }) {
         const assignment = idField('assignment');
         const [record] = await sql`SELECT expert_id FROM assignments WHERE id = ${assignment}`;
         if (!record) return reject('Assignment not found.', 404);
-        const invitation = await generateInvitation(assignment);
-        cookies.set('new-invitation', invitation, { ...cookieOptions, path: '/admin', maxAge: 300 });
+        const invitation = await generateInvitation(assignment, new URL(request.url).origin);
+        cookies.set('new-invitation', invitation.token, { ...cookieOptions, path: '/admin', maxAge: 300 });
+        cookies.set('invitation-email-status', invitation.emailStatus, { ...cookieOptions, path: '/admin', maxAge: 300 });
         destination = `/admin/users/${record.expert_id}`;
         break;
       }
