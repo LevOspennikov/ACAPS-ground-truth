@@ -1,14 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { db } from './db.js';
 import { hash, token } from './auth.js';
-import template from '../data/questions.js';
 import { coverageEligibility, expertCoverage } from './coverage.js';
-import { validateQuestions } from './answers.js';
 import { isUuid } from './ids.js';
 import { emailInvitation } from './invitation-email.js';
 
 export const validId = isUuid;
-export async function categories() { return db()`SELECT * FROM categories ORDER BY archived, lower(name)`; }
 export async function users(search = '') {
   return db()`SELECT e.*, ARRAY(SELECT g.name FROM expert_countries ec JOIN regions g ON g.slug = ec.region_slug WHERE ec.expert_id = e.id ORDER BY g.name) AS countries, count(a.id)::int AS assigned, count(r.submitted_at)::int AS submitted
     FROM experts e LEFT JOIN assignments a ON a.expert_id = e.id LEFT JOIN responses r ON r.assignment_id = a.id
@@ -30,28 +27,6 @@ export async function userDetail(id) {
     AND NOT EXISTS(SELECT 1 FROM assignments a WHERE a.questionnaire_id = q.id AND a.expert_id = e.id) ORDER BY q.created_at DESC`, [id]);
   return { user, assignments, available, coverage: await expertCoverage(id) };
 
-}
-export async function crises(category = '', status = 'active') {
-  return db()`SELECT c.*, k.name AS category_name, count(q.id)::int AS questionnaires
-    FROM crises c JOIN categories k ON k.id = c.category_id LEFT JOIN questionnaires q ON q.crisis_id = c.id
-    WHERE (${category} = '' OR c.category_id::text = ${category}) AND (${status} = 'all' OR c.archived = ${status === 'archived'})
-    GROUP BY c.id, k.name ORDER BY c.created_at DESC`;
-}
-export async function crisisDetail(id) {
-  const sql = db();
-  const [crisis] = await sql`SELECT c.*, k.name AS category_name FROM crises c JOIN categories k ON k.id = c.category_id WHERE c.id = ${id}`;
-  if (!crisis) return null;
-  const questionnaires = await sql`SELECT q.id, q.title, count(a.id)::int AS assigned, count(r.submitted_at)::int AS submitted
-    FROM questionnaires q LEFT JOIN assignments a ON a.questionnaire_id = q.id LEFT JOIN responses r ON r.assignment_id = a.id
-    WHERE q.crisis_id = ${id} GROUP BY q.id ORDER BY q.created_at DESC`;
-  return { crisis, questionnaires };
-}
-export async function createQuestionnaire(crisisId, title, context) {
-  const questions = validateQuestions(template);
-  const [created] = await db()`INSERT INTO questionnaires (id, crisis_id, title, context, questions)
-    SELECT ${randomUUID()}, id, ${title}, ${context}, ${JSON.stringify(questions)}::jsonb FROM crises WHERE id = ${crisisId} AND archived = false RETURNING id`;
-  if (!created) throw new Error('Choose an active crisis.');
-  return created.id;
 }
 export async function assignQuestionnaire(expertId, questionnaireId) {
   const [assignment] = await db().query(`INSERT INTO assignments (id, questionnaire_id, expert_id)

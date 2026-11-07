@@ -62,15 +62,14 @@ Local and Preview builds never trigger this reset. To stop deleting data, set `R
 
 ## Test the prototype
 
-1. Visit `/admin` and sign in with `ADMIN_PASSWORD`. The overview links to **Users** and **Crises & categories**.
-2. In Crises, create a category, then a crisis with title, country and description. Categories can be renamed or archived and crises filtered by category/status.
-3. Open the crisis and create a questionnaire. Its questions are snapshotted from `src/data/questions.js`; these crisis questionnaires use the code template. Region questionnaires retain their existing question editor. Changing the code template never changes an existing questionnaire.
-4. In Users, create a named or anonymous synthetic profile. Every user has a pseudonym. Anonymous profiles must have empty name/email; the database enforces this. Converting a named profile requires clearing those fields and explicitly confirming removal.
-5. Open the user, assign the questionnaire, then generate a magic link. For named profiles with an email address, generation also attempts email delivery and shows the result. Anonymous profiles and named profiles without email use manual links. Copy the link to another browser and accept it. Regenerating a link reuses the same assignment and invalidates older unused invitations without deleting answers or valid sessions.
-6. Answer a question, save, and reload. Next/Back/Save all persist progress in Neon. A fresh invitation on another browser resumes that assignment, including its saved step. No offline storage or delivery is claimed.
-7. Finish the questions, review, and submit. Submission is final. Open results through the crisis to see single-choice counts and confidential submitted answers without user identities. Draft contents stay private.
-8. Deactivate a user to revoke all invitations/sessions and block access; reactivation requires a new link. Archive a crisis to stop new questionnaires/assignments while keeping existing expert access. Archiving a category removes it from new-crisis choices, without changing existing crises.
-9. Confirm that all users and links disappear on the next production deployment while prototype reset mode remains enabled.
+1. Visit `/admin` and sign in with `ADMIN_PASSWORD`. Choose a country, then select a risk from its risk list.
+2. Generate a questionnaire for the selected risk. Review and edit its questions, then choose eligible experts and create invitation links from the questionnaire page.
+3. In **Users**, create and manage synthetic expert profiles and their country/risk coverage. Profiles need matching coverage to appear as eligible recipients.
+4. Share an invitation link with the intended expert. Links are single-use and time-limited; existing answers and valid sessions are preserved when a new link is generated.
+5. Answer a question, save, and reload. Next/Back/Save persist progress in Neon. A fresh invitation on another browser resumes that assignment, including its saved step. No offline storage or delivery is claimed.
+6. Finish the questions, review, and submit. Submission is final. View results from the questionnaire page; submitted answers are shown without user identities, and draft contents stay private.
+7. Deactivate a user to revoke all invitations/sessions and block access; reactivation requires a new link.
+8. Confirm that users and links disappear on the next production deployment while prototype reset mode remains enabled.
 
 Run `npm test` for validation, privacy-mode and reset-policy tests, and `npm run build` to validate Vercel output. A live Neon database is required for the end-to-end flow. Local builds preserve the database; opted-in production builds reset it.
 
@@ -119,7 +118,7 @@ src/middleware.js             Privacy and security headers
 
 ## Current scope and next iterations
 
-This is a synthetic-data deployment prototype with user, crisis and category management. Categories apply only to crises. User profiles support named (admin-only identity) and anonymous modes; deactivation preserves answers while blocking access. There are no user deletions. Questionnaire metadata is set at creation, and single-choice/text prompts stay defined in code. Each questionnaire stores an immutable prompt snapshot. Responses contain question-ID-keyed answers and server-side progress, not the old fixed rating columns. Results show single-choice counts over all submissions and the latest 100 unattributed responses. Free text may contain identifying information and must be treated as confidential. There are no expert-facing group results or public attribution options.
+This is a synthetic-data deployment prototype organized around country risks and their questionnaires. User profiles support named (admin-only identity) and anonymous modes; deactivation preserves answers while blocking access. There are no user deletions. Questionnaire metadata is set at creation, and single-choice/text prompts stay defined in code. Each questionnaire stores an immutable prompt snapshot. Responses contain question-ID-keyed answers and server-side progress, not the old fixed rating columns. Results show single-choice counts over all submissions and the latest 100 unattributed responses. Free text may contain identifying information and must be treated as confidential. There are no expert-facing group results or public attribution options.
 
 The Neon Vercel integration may provide `STORAGE_DATABASE_URL`; the app and schema setup script accept this as a fallback to `DATABASE_URL`. Keep `ADMIN_PASSWORD` and `SESSION_SECRET` configured separately. If the database is new, sign in to admin and use **Initialize missing tables**, or apply `db/schema.sql` through Neon's SQL Editor. Initialization uses only `CREATE TABLE IF NOT EXISTS` and preserves existing records. Production secrets marked Sensitive cannot be downloaded with `vercel env pull`; configure a separate local development database connection instead.
 
