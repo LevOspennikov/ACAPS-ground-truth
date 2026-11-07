@@ -1,0 +1,51 @@
+---
+const { users = [] } = Astro.props;
+---
+<div class="users-list">
+  <div class="list-heading" aria-hidden="true"><span>Expert</span><span>Country coverage</span><span>Responses</span><span></span></div>
+  <ul>
+    {users.map((user) => <li class="user-row">
+      <div class="user-identity">
+        <h2><a href={`/admin/users/${user.id}`}>{user.pseudonym}</a></h2>
+        <div class="user-meta"><span class:list={['user-status', { inactive: !user.active }]}>{user.active ? 'Active' : 'Inactive'}</span><span>{user.profile_mode === 'named' ? 'Named' : 'Anonymous'}</span></div>
+        {user.profile_mode === 'named' && (user.name || user.email) && <p class="user-contact">{[user.name, user.email].filter(Boolean).join(' · ')}</p>}
+      </div>
+      <p class:list={['user-countries', { 'needs-coverage': !user.countries.length }]}>{user.countries.length ? user.countries.join(' · ') : 'Needs country assignment'}</p>
+      <p class="user-progress">{user.assigned ? <><strong>{user.submitted}</strong> of {user.assigned}<span>submitted</span></> : <span>No assignments</span>}</p>
+      <a class="user-action" href={`/admin/users/${user.id}`} aria-label={`Manage ${user.pseudonym}`}>Manage <span aria-hidden="true">→</span></a>
+    </li>)}
+  </ul>
+</div>
+
+<style>
+  .users-list { overflow: hidden; border: 1px solid #d4ddd1; border-radius: 10px; background: #fff; }
+  .list-heading, .user-row { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) 7rem 4.8rem; align-items: center; gap: 1.2rem; padding: .9rem 1.1rem; }
+  .list-heading { background: #edf1e8; color: #53675d; font-size: .72rem; font-weight: 700; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  .user-row + .user-row { border-top: 1px solid #e4ebda; }
+  .user-row:hover { background: #fafbf8; }
+  .user-identity { min-width: 0; }
+  h2 { margin: 0 0 .2rem; font-size: .95rem; line-height: 1.4; overflow-wrap: anywhere; }
+  h2 a { color: #17352f; text-decoration: none; }
+  h2 a:hover, .user-action:hover { text-decoration: underline; }
+  .user-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; color: #53675d; font-size: .72rem; }
+  .user-status { display: inline-flex; align-items: center; gap: .3rem; }
+  .user-status::before { content: ''; width: .4rem; height: .4rem; border-radius: 50%; background: #547d35; }
+  .user-status.inactive::before { background: #7b8277; }
+  .user-contact { margin: .25rem 0 0; color: #53675d; font-size: .75rem; overflow-wrap: anywhere; }
+  .user-countries { margin: 0; font-size: .82rem; color: #53675d; overflow-wrap: anywhere; }
+  .needs-coverage { color: #924722; }
+  .user-progress { margin: 0; font-size: .85rem; line-height: 1.4; }
+  .user-progress > span { display: block; color: #53675d; font-size: .73rem; }
+  .user-action { display: inline-flex; align-items: center; justify-content: flex-end; gap: .3rem; min-height: 2.75rem; font-size: .82rem; font-weight: 650; text-decoration: none; }
+  @media (max-width: 700px) {
+    .list-heading { display: none; }
+    .user-row { grid-template-columns: minmax(0, 1fr) auto; gap: .45rem .75rem; padding: .9rem 1rem; }
+    .user-identity { grid-column: 1; grid-row: 1; }
+    .user-action { grid-column: 2; grid-row: 1; }
+    .user-countries { grid-column: 1 / -1; grid-row: 2; }
+    .user-progress { grid-column: 1 / -1; grid-row: 3; font-size: .75rem; color: #53675d; }
+    .user-progress > span { display: inline; margin-left: .3rem; }
+    .user-progress > span:only-child { margin-left: 0; }
+  }
+</style>

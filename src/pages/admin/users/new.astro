@@ -1,0 +1,21 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import CoverageFields from '../../../components/CoverageFields.astro';
+import UserFields from '../../../components/UserFields.astro';
+import { coverageOptions } from '../../../server/coverage.js';
+import { configured } from '../../../server/db.js';
+import { isAdmin } from '../../../server/auth.js';
+if (!configured() || !isAdmin(Astro.cookies)) return Astro.redirect('/admin');
+let countries = []; let failed = false;
+try { countries = await coverageOptions(); } catch { failed = true; Astro.response.status = 503; }
+---
+<AdminLayout title="Add user">
+  <a href="/admin/users">← All users</a>
+  <h1>Add user</h1>
+  <p class="muted">Create an expert profile and choose their country and risk coverage.</p>
+  {failed ? <p class="notice error" role="alert">Could not load country coverage. <a href="/admin/users/new">Try again</a>.</p> : <form class="card" method="post" action="/api/admin/manage/user-create">
+    <UserFields />
+    <CoverageFields countries={countries} />
+    <div class="actions"><button disabled={!countries.length}>Create user</button><a class="button secondary" href="/admin/users">Cancel</a></div>
+  </form>}
+</AdminLayout>
