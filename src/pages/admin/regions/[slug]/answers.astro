@@ -4,7 +4,7 @@ import AdminAccess from "../../../../components/AdminAccess.astro";
 import { configured } from "../../../../server/db.js";
 import { isAdmin } from "../../../../server/auth.js";
 import { riskAnswers } from "../../../../server/regions.js";
-import { pieSegments } from "../../../../server/charts.js";
+import { pieSegments, chartColor } from "../../../../server/charts.js";
 
 const ready = configured();
 const authenticated = ready && isAdmin(Astro.cookies);
@@ -41,7 +41,7 @@ if (authenticated && !loadError && !page) return new Response("Risk not found", 
                   {question.replies.map((reply) => (
                     <li>
                       <p><strong>{reply.expert}</strong> · {reply.date}</p>
-                      <p class="answer-context">{reply.value}</p>
+                      <p class="answer-context">{question.type === 'single' && reply.option != null && <span class="answer-swatch" style={`background:${chartColor(reply.option)}`}></span>}{reply.value}</p>
                     </li>
                   ))}
                 </ul>

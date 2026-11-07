@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateQuestions, validateAnswer, firstUnanswered, answerLabel, describeAnswers } from '../src/server/answers.js';
+import { validateQuestions, validateAnswer, firstUnanswered, answerLabel, answerOption, describeAnswers } from '../src/server/answers.js';
 import { profileFields } from '../src/server/profiles.js';
 const questions = [{id:'risk',type:'single',prompt:'Risk?',options:['Low','High']},{id:'context',type:'text',prompt:'Context?'}];
 test('answers must match the assigned question snapshot', () => {
@@ -8,6 +8,13 @@ test('answers must match the assigned question snapshot', () => {
   for (const value of ['other-1','risk-2','risk--1']) assert.throws(() => validateAnswer(questions[0], value));
   assert.throws(() => validateAnswer(questions[1], 'x'.repeat(4001)));
   assert.equal(answerLabel(questions[0], 'risk-1'), 'High');
+});
+test('answerOption maps a stored single-choice value to its index', () => {
+  assert.equal(answerOption(questions[0], 'risk-1'), 1);
+  assert.equal(answerOption(questions[0], 'risk-0'), 0);
+  assert.equal(answerOption(questions[0], 'other-1'), null);
+  assert.equal(answerOption(questions[0], ''), null);
+  assert.equal(answerOption(questions[1], 'text here'), null);
 });
 test('submission finds missing required answers and supports optional text', () => {
   assert.equal(firstUnanswered(questions, {}), 0);

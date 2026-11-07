@@ -2,7 +2,7 @@ import { countrySlug, selectCountryRisk } from "../data/countries.js";
 import { randomUUID } from "node:crypto";
 import { db } from "./db.js";
 import { isUuid } from "./ids.js";
-import { answerLabel, describeAnswers, questionOptions, parseQuestions, readAnswers } from "./answers.js";
+import { answerLabel, answerOption, describeAnswers, questionOptions, parseQuestions, readAnswers } from "./answers.js";
 
 export function formatDate(value) {
   if (!value) return "";
@@ -188,17 +188,25 @@ export async function riskAnswers(slug, riskId) {
       invited: questionnaire.invited,
       submitted: questionnaire.replies.length,
       distributions: questionnaire.distributions,
-      questions: (questionnaire.questions || []).map((question) => ({
-        id: question.id,
-        prompt: question.prompt || "Question",
-        type: question.type || "text",
-        options: question.type === "single" ? questionOptions(question) : [],
-        replies: questionnaire.replies.map((reply) => ({
-          expert: reply.expert,
-          date: reply.date,
-          value: answerLabel({ ...question, type: question.type || "text", options: question.type === "single" ? questionOptions(question) : [] }, String(reply.answers[question.id] ?? "")),
-        })),
-      })),
+      questions: (questionnaire.questions || []).map((question) => {
+        const isSingle = question.type === "single";
+        const options = isSingle ? questionOptions(question) : [];
+        return {
+          id: question.id,
+          prompt: question.prompt || "Question",
+          type: question.type || "text",
+          options,
+          replies: questionnaire.replies.map((reply) => {
+            const raw = String(reply.answers[question.id] ?? "");
+            return {
+              expert: reply.expert,
+              date: reply.date,
+              value: answerLabel({ ...question, type: question.type || "text", options }, raw),
+              option: answerOption({ ...question, type: question.type || "text", options }, raw),
+            };
+          }),
+        };
+      }),
     })),
   };
 }

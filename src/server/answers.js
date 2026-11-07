@@ -18,11 +18,19 @@ export function firstUnanswered(questions, answers) {
   const index = questions.findIndex((q) => q.required !== false && !answers[q.id]?.trim());
   return index === -1 ? questions.length : index;
 }
+export function answerOption(question, value) {
+  if (!value || question.type === 'text') return null;
+  const options = Array.isArray(question.options) ? question.options : questionOptions(question);
+  const index = options.findIndex((_, i) => value === `${question.id}-${i}`);
+  return index === -1 ? null : index;
+}
+
 export function answerLabel(question, value) {
   if (!value) return 'No answer provided';
   if (question.type === 'text') return value;
-  const index = question.options.findIndex((_, i) => value === `${question.id}-${i}`);
-  return question.options[index] ?? 'No answer provided';
+  const options = Array.isArray(question.options) ? question.options : questionOptions(question);
+  const index = options.findIndex((_, i) => value === `${question.id}-${i}`);
+  return options[index] ?? 'No answer provided';
 }
 
 function parseJson(value) {
