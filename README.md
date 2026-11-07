@@ -25,6 +25,33 @@ The homepage works without environment variables as a deployment smoke check. Da
 
 No Vercel CLI, Resend account, or separate backend host is needed for manual setup. `vercel.json` explicitly selects `npm run build` so the prototype database-reset hook runs when enabled. Frontend and backend code are separated within one deployment to keep this first setup small. Framework configuration follows the [Astro Vercel adapter documentation](https://docs.astro.build/en/guides/integrations-guide/vercel/).
 
+## Optional standalone email helper
+
+`src/server/email.js` exposes `sendEmail({ to, subject, text, html?, idempotencyKey? })` using native `fetch` and no SDK. It is server-only and independent of invitations and other app flows. Email configuration is optional for builds and normal app use; no provider account setup or real sending is performed by this implementation or its tests.
+
+1. Obtain a sending API key through the [Resend Vercel Marketplace integration](https://vercel.com/marketplace/resend), which sets `RESEND_API_KEY` in your selected project, or create a key in the [Resend dashboard](https://resend.com/api-keys).
+2. Set `RESEND_API_KEY` and `EMAIL_FROM` in your local server environment (`.env` under Astro) or Vercel environment settings. Use `EMAIL_FROM="Ground Truth <onboarding@resend.dev>"` for testing. Keep both variables server-side, without a `PUBLIC_` prefix, and redeploy after changing Vercel variables.
+3. The [Resend test domain restriction](https://resend.com/docs/knowledge-base/403-error-resend-dev-domain) permits sending only to the email address associated with your Resend account. To reach arbitrary recipients, verify an owned domain and update `EMAIL_FROM` to an address on it. Check [Resend pricing](https://resend.com/pricing) for current free-tier quotas.
+
+Example for server code, after configuring the environment (calling this sends an email):
+
+```js
+import { sendEmail } from './src/server/email.js';
+
+const { id } = await sendEmail({
+  to: 'your-resend-account@example.org', // Replace with your account address.
+  subject: 'Ground Truth test',
+  text: 'This is a standalone email helper test.',
+  html: '<p>This is a standalone email helper test.</p>', // Optional.
+  idempotencyKey: 'ground-truth-test-unique-operation-id', // Optional; persist per send.
+});
+// id confirms provider acceptance, not inbox delivery.
+```
+
+Each call accepts one bare email address, a nonempty subject and plain-text body, plus optional HTML. Quoted local parts and display-name recipients are not supported. Idempotency keys must be 1–256 visible ASCII characters without spaces. The helper reads configuration at call time, times out after 10 seconds (including reading the response), and never retries automatically.
+
+Errors have sanitized messages and a stable `code`: `not_configured` for missing/unusable configuration, `invalid_input` for invalid arguments, `provider_rejected` for non-success HTTP responses, or `send_unconfirmed` for network failures, timeouts, or malformed success responses. An unconfirmed send may already have been accepted. For caller-initiated retries, reuse the same key and identical payload; [Resend retains idempotency keys for 24 hours](https://resend.com/docs/api-reference/emails/send-email). The helper never logs private data or attaches raw provider errors; callers must also avoid logging addresses, bodies or credentials.
+
 ## Reset on prototype deployments
 
 Set `RESET_DATABASE_ON_DEPLOY=true` in Vercel's **Production** environment to start each production deployment with empty application tables recreated from `db/schema.sql`. This deletes application records, including categories, crises, region data, questionnaires, synthetic experts, assignments, invitations, sessions, answers, and manually added risk radar records. The risk radar catalog is then reseeded with the twelve CSV records. Admin credentials remain in Vercel environment variables. Integration-managed tables and the database itself are preserved.
