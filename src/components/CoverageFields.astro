@@ -1,17 +1,93 @@
 ---
 const { countries = [], coverage = [] } = Astro.props;
 ---
-<fieldset><legend>Countries and risk coverage</legend>
-  <p>Select at least one country. For each selected country, cover all risks or choose specific risks. Coverage changes affect future invitations; existing assignments and answers stay accessible.</p>
+<fieldset class="coverage"><legend>Countries and risk coverage</legend>
+  <p class="coverage-intro">Choose the countries this expert covers, then include all risks or select specific ones.</p>
   {!countries.length && <p class="notice">No countries available. Initialize the country data from admin first.</p>}
-  {countries.map((country) => {
+  <div class="coverage-countries">{countries.map((country) => {
     const membership = coverage.find((item) => item.region === country.slug);
-    return <details class="card" open={Boolean(membership)}>
-      <summary>{country.name}{membership ? ' · assigned' : ''}</summary>
-      <label class="choice"><input type="checkbox" name="countries" value={country.slug} checked={Boolean(membership)} />Include {country.name}</label>
-      <label class="choice"><input type="radio" name={`scope_${country.slug}`} value="all" checked={!membership || membership.scope === 'all'} />All risks in {country.name}</label>
-      <label class="choice"><input type="radio" name={`scope_${country.slug}`} value="selected" checked={membership?.scope === 'selected'} />Only selected risks below</label>
-      {country.risks.length ? country.risks.map((risk) => <label class="choice"><input type="checkbox" name={`risks_${country.slug}`} value={risk.risk_id} checked={membership?.risks.includes(risk.risk_id)} />{risk.risk_id} · {risk.risk_title}</label>) : <p class="muted">No specific risks yet; choose all-risk coverage.</p>}
-    </details>;
-  })}
+    return <div class="coverage-country">
+      <label class="country-heading">
+        <input class="country-toggle" type="checkbox" name="countries" value={country.slug} checked={Boolean(membership)} aria-controls={`coverage-${country.slug}`} />
+        <span class="country-name"><strong>{country.name}</strong><small>{country.risks.length} {country.risks.length === 1 ? 'risk' : 'risks'} available</small></span>
+        <span class="country-status" aria-hidden="true"><span class="status-off">Not included</span><span class="status-all">All risks</span><span class="status-selected">Specific risks</span></span>
+      </label>
+      <div class="country-coverage" id={`coverage-${country.slug}`}>
+        <fieldset class="coverage-scope"><legend>Coverage for {country.name}</legend>
+          <div class="scope-options">
+            <label class="scope-option"><input type="radio" name={`scope_${country.slug}`} value="all" checked={!membership || membership.scope === 'all'} /><span><strong>All risks</strong><small>Current and future risks</small></span></label>
+            <label class="scope-option"><input type="radio" name={`scope_${country.slug}`} value="selected" checked={membership?.scope === 'selected'} disabled={!country.risks.length} /><span><strong>Specific risks</strong><small>Choose from the list below</small></span></label>
+          </div>
+        </fieldset>
+        {country.risks.length ? <fieldset class="risk-options"><legend>Select risks in {country.name}</legend>
+          <p class="risk-hint">Choose at least one risk.</p>
+          <div class="risk-rows">{country.risks.map((risk) => <label class="risk-option"><input type="checkbox" name={`risks_${country.slug}`} value={risk.risk_id} checked={membership?.risks.includes(risk.risk_id)} /><span class="risk-id">{risk.risk_id}</span><span class="risk-title">{risk.risk_title}</span></label>)}</div>
+        </fieldset> : <p class="empty-risks">No risks listed yet. All-risk coverage includes risks added later.</p>}
+      </div>
+    </div>;
+  })}</div>
+  <p class="coverage-note">Select at least one country. Changes apply to future invitations; existing assignments and answers stay accessible.</p>
 </fieldset>
+
+<style>
+  .coverage { min-width: 0; padding: 1.25rem; }
+  .coverage > legend { max-width: 100%; }
+  .coverage-intro { margin: .35rem 0 1.25rem; color: #53675d; font-size: .95rem; }
+  .coverage-countries { display: grid; gap: .65rem; }
+  .coverage-country { min-width: 0; border: 1px solid #d4ddd1; border-radius: 10px; overflow: clip; }
+  .country-heading { display: flex; align-items: center; gap: .8rem; margin: 0; padding: .9rem 1rem; cursor: pointer; }
+  .country-heading:hover { background: #f7f9f4; }
+  .coverage input { flex: none; width: 1.1rem; height: 1.1rem; margin: 0; padding: 0; accent-color: #235f47; cursor: pointer; }
+  .country-name { display: grid; gap: .05rem; min-width: 0; }
+  .country-name strong { font-size: 1rem; overflow-wrap: anywhere; }
+  .country-name small { font-size: .78rem; font-weight: 400; }
+  .country-status { display: none; margin-left: auto; padding: .15rem .55rem; border-radius: 999px; background: #f0f3ed; color: #53675d; font-size: .72rem; font-weight: 650; white-space: nowrap; }
+  .status-all, .status-selected { display: none; }
+  .country-coverage { padding: 1rem; border-top: 1px solid #d4ddd1; }
+  .coverage-scope, .risk-options { min-width: 0; padding: 0; margin: 0; border: 0; border-radius: 0; }
+  .coverage-scope legend, .risk-options legend { padding: 0; margin-bottom: .65rem; font-size: .82rem; }
+  .scope-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; }
+  .scope-option { display: flex; align-items: flex-start; gap: .65rem; margin: 0; padding: .8rem; border: 1px solid #d4ddd1; border-radius: 7px; cursor: pointer; }
+  .scope-option input { margin-top: .2rem; }
+  .scope-option span { display: grid; gap: .1rem; }
+  .scope-option strong { font-size: .88rem; font-weight: 650; }
+  .scope-option small { font-size: .75rem; font-weight: 400; }
+  .scope-option:hover { border-color: #93a593; }
+  .scope-option:has(input:checked) { background: #edf4ea; border-color: #547d35; }
+  .scope-option:has(input:disabled) { opacity: .55; cursor: default; }
+  .risk-options { margin-top: 1.2rem; }
+  .risk-options legend { margin-bottom: 0; }
+  .risk-hint, .empty-risks { margin: .2rem 0 .65rem; font-size: .78rem; color: #53675d; }
+  .empty-risks { margin: .8rem 0 0; }
+  .risk-option { display: grid; grid-template-columns: 1.1rem 3.6rem minmax(0, 1fr); align-items: start; gap: .7rem; margin: 0; padding: .8rem .5rem; border-top: 1px solid #e4ebda; cursor: pointer; font-weight: 400; line-height: 1.45; }
+  .risk-option input { margin-top: .12rem; }
+  .risk-option:hover { background: #f7f9f4; }
+  .risk-option:has(input:checked) { background: #edf4ea; }
+  .risk-id { padding-top: .1rem; color: #53675d; font-size: .75rem; font-weight: 700; }
+  .risk-title { font-size: .85rem; overflow-wrap: anywhere; }
+  .coverage-note { margin: 1rem 0 0; font-size: .78rem; color: #53675d; }
+  .country-heading:has(input:focus-visible), .scope-option:has(input:focus-visible), .risk-option:has(input:focus-visible) { outline: 2px solid #d58936; outline-offset: -3px; }
+  @supports selector(:has(*)) {
+    .country-status { display: inline-block; }
+    .coverage-country:not(:has(.country-toggle:checked)) .country-coverage { display: none; }
+    .coverage-country:has(.country-toggle:checked) { border-color: #93ab90; }
+    .coverage-country:has(.country-toggle:checked) .country-status { background: #e4eddb; color: #235f47; }
+    .coverage-country:has(.country-toggle:checked) .status-off { display: none; }
+    .coverage-country:has(.country-toggle:checked):has(input[type=radio][value=all]:checked) .status-all { display: inline; }
+    .coverage-country:has(.country-toggle:checked):has(input[type=radio][value=selected]:checked) .status-selected { display: inline; }
+    .country-coverage:not(:has(input[type=radio][value=selected]:checked)) .risk-options { display: none; }
+  }
+  @media (max-width: 520px) {
+    .coverage { padding: 1rem; }
+    .country-heading { padding: .8rem; gap: .65rem; }
+    .country-status { font-size: .65rem; padding: .15rem .4rem; }
+    .country-coverage { padding: .8rem; }
+    .scope-options { grid-template-columns: 1fr; gap: .5rem; }
+    .risk-option { grid-template-columns: 1.1rem minmax(0, 1fr); gap: .15rem .65rem; }
+    .risk-option input { grid-row: span 2; }
+    .risk-title { grid-column: 2; }
+  }
+  @media (max-width: 380px) {
+    .country-status { display: none; }
+  }
+</style>
